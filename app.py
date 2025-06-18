@@ -280,6 +280,8 @@ def search_dashboard_data():
             summary_for_display['totalIncentives'] = sum_of_all_individual_incentives
 
     return jsonify({ "baNameDisplay": ba_display_name, "searchCriteria": search_criteria_frontend, "summary": summary_for_display, "monthDisplay": search_month.upper(), "weekDisplay": search_week.upper(), "dateRangeDisplay": date_range_display, "status": "Active", "resultsTable": results_for_table, "rankedBaList": final_ranked_ba_list, "lastUpdate": datetime.now().strftime('%A, %B %d, %Y, %I:%M:%S %p') })
+     
+    last_update_timestamp = datetime.now().strftime('%A, %B %d, %Y, %I:%M:%S %p')
 
 def log_user_event(function_name, inputs):
     if not sheet_api: return
