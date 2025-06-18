@@ -8,6 +8,7 @@ from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import Flow
 import logging
 import requests
+import pytz  # <--- NEW: Import the timezone library
 
 # --- Basic Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -17,30 +18,26 @@ DATABASE_SHEET_ID = '1ZufXPOUcoW2czQ0vcpZwvJNHngV4GHbbSl9q46UwF8g'
 LOGS_SHEET_ID = '1ZufXPOUcoW2czQ0vcpZwvJNHngV4GHbbSl9q46UwF8g'
 SCOPES_SERVICE_ACCOUNT = ['https://www.googleapis.com/auth/spreadsheets']
 SPECIAL_USER_EMAILS = ['harrypobreza@gmail.com', 'official.tutansradio@gmail.com']
+YOUR_TIMEZONE = 'Asia/Manila' # <--- NEW: Set your local timezone (e.g., Philippines)
 
 # --- Flask App Initialization ---
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
-# --- User Login Management Setup ---
+# (The rest of the file is the same until the /api/search route)
+# ...
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
-
 class User(UserMixin):
     def __init__(self, id, name, email, is_special=False):
         self.id, self.name, self.email, self.is_special = id, name, email, is_special
-
 users = {}
-
 @login_manager.user_loader
 def load_user(user_id):
     return users.get(user_id)
-
-# --- Google OAuth & Service Account Setup ---
 CLIENT_SECRET_FILE = 'client_secret.json'
 SCOPES_OAUTH = ['https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email', 'openid']
-
 creds_service_account = None
 try:
     if 'GOOGLE_CREDENTIALS_JSON' in os.environ:
@@ -55,9 +52,6 @@ try:
 except Exception as e:
     logging.error(f"FATAL ERROR: Could not load Google Sheets credentials. {e}")
     sheet_api = None
-
-
-# --- Helper Functions ---
 def to_float(value):
     if isinstance(value, (int, float)): return float(value)
     if not isinstance(value, str): return 0.0
@@ -65,7 +59,6 @@ def to_float(value):
     if not cleaned_value: return 0.0
     try: return float(cleaned_value)
     except (ValueError, TypeError): return 0.0
-
 def get_all_sheet_data(sheet_id, sheet_name):
     if not sheet_api: return None
     try:
@@ -74,7 +67,6 @@ def get_all_sheet_data(sheet_id, sheet_name):
     except Exception as e:
         logging.error(f"Error fetching sheet data: {e}")
         return None
-
 def calculate_date_range(month_name, week_str):
     try:
         month_map = { "January": 1, "February": 2, "March": 3, "April": 4, "May": 5, "June": 6, "July": 7, "August": 8, "September": 9, "October": 10, "November": 11, "December": 12 }
@@ -95,20 +87,15 @@ def calculate_date_range(month_name, week_str):
     except Exception as e:
         logging.error(f"Error in calculate_date_range: {e}")
         return ""
-
-# --- Main Application Routes ---
 @app.route('/')
 @login_required
 def index():
     return render_template('index.html')
-
-# --- Login and Authentication Routes ---
 @app.route('/login')
 def login():
     return """
         <!DOCTYPE html><html><head><title>Login</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background-color: #121212; color: #e0e0e0; margin: 0; } h1 { font-weight: 500; margin-bottom: 2rem; } a { display: inline-flex; align-items: center; gap: 12px; background-color: #FFFFFF; color: #1f2937; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); transition: transform 0.2s; } a:hover { transform: translateY(-2px); } img { width: 24px; height: 24px; }</style></head><body><h1>Dashboard Login</h1><a href="/authorize"><img src="https://developers.google.com/identity/images/g-logo.png" alt="Google logo">Sign In with Google</a></body></html>
     """
-
 @app.route("/authorize")
 def authorize():
     if not os.path.exists(CLIENT_SECRET_FILE): return "Error: client_secret.json not found.", 500
@@ -116,7 +103,6 @@ def authorize():
     authorization_url, state = flow.authorization_url()
     session["state"] = state
     return redirect(authorization_url)
-
 @app.route("/callback")
 def callback():
     flow = Flow.from_client_secrets_file(CLIENT_SECRET_FILE, scopes=SCOPES_OAUTH, state=session["state"], redirect_uri=url_for('callback', _external=True))
@@ -130,19 +116,15 @@ def callback():
     users[user_id] = user
     login_user(user)
     return redirect(url_for('index'))
-
 @app.route("/logout")
 @login_required
 def logout():
     logout_user()
     return redirect(url_for('login'))
-
-# --- API Routes ---
 @app.route('/api/user-info', methods=['GET'])
 @login_required
 def get_user_info():
     return jsonify({"email": current_user.email, "name": current_user.name, "isSpecial": current_user.is_special})
-
 @app.route('/api/ba-names', methods=['GET'])
 @login_required
 def get_unique_ba_names():
@@ -178,8 +160,11 @@ def search_dashboard_data():
     date_range_display = calculate_date_range(month, week)
     
     # ======================= THIS IS THE FIX =======================
-    # Generate the timestamp right before returning any data.
-    last_update_timestamp = datetime.now().strftime('%A, %B %d, %Y, %I:%M:%S %p')
+    # Get the current time in UTC, then convert it to your local timezone
+    utc_now = datetime.now(pytz.utc)
+    local_tz = pytz.timezone(YOUR_TIMEZONE)
+    local_now = utc_now.astimezone(local_tz)
+    last_update_timestamp = local_now.strftime('%A, %B %d, %Y, %I:%M:%S %p')
     # ===============================================================
 
     if not period_data_rows:
@@ -229,7 +214,13 @@ def search_dashboard_data():
 def log_user_event(function_name, inputs):
     if not sheet_api: return
     try:
-        timestamp, user_email = datetime.now().strftime('%A, %B %d, %Y, %I:%M:%S %p'), current_user.email if current_user.is_authenticated else "Anonymous"
+        # Also fix the logging timestamp to use the correct timezone
+        utc_now = datetime.now(pytz.utc)
+        local_tz = pytz.timezone(YOUR_TIMEZONE)
+        local_now = utc_now.astimezone(local_tz)
+        timestamp = local_now.strftime('%A, %B %d, %Y, %I:%M:%S %p')
+        user_email = current_user.email if current_user.is_authenticated else "Anonymous"
+        
         ba_names_str = ', '.join(inputs.get('baNames', [])) if inputs.get('baNames') else "N/A"
         formatted_inputs = f"Month - {inputs.get('month', 'N/A')}, Week - {inputs.get('week', 'N/A').replace('week ', '')}, Ba Name(s) - {ba_names_str}, Palcode - {inputs.get('palcode', 'N/A') or 'N/A'}"
         row_to_append = [timestamp, user_email, function_name, formatted_inputs]
