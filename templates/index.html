@@ -4,18 +4,15 @@
   <base target="_top">
   <title>Dashboard & Payout Scheme</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- REVERTED: Restored original font links -->
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@400;700&family=Lexend:wght@700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Anton&display=swap" rel="stylesheet">
-  
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-  <!-- The rest of your HTML structure is exactly the same as the last correct version -->
   <!-- Tab Navigation & Dark Mode Toggle -->
   <div class="top-navigation">
     <div id="topLeftDynamicContent" class="top-left-dynamic-content">
-        <!-- JS will move title/search controls here when not on the Home tab -->
+        <!-- JS will move title/search controls here -->
     </div>
     <div class="tabs-and-toggle-container">
         <div class="tabs">
@@ -23,10 +20,19 @@
             <button id="dashboardTabBtn" class="tab-button" onclick="showTab('dashboardDisplayArea', this)">Dashboard</button>
             <button id="salaryTabBtn" class="tab-button" onclick="showTab('salarySchemeArea', this)">Salary Scheme</button>
         </div>
+        
+        <!-- NEW: User Info and Logout Button -->
+        <div id="userInfo" class="user-info" style="display: none;">
+            <span id="userName" class="user-name"></span>
+            <a href="/logout" class="logout-button">Sign Out</a>
+        </div>
+
         <button id="darkModeToggle" title="Toggle Dark/Light Mode">☀️</button>
     </div>
   </div>
 
+  <!-- The rest of the HTML body is exactly the same -->
+  <!-- ... (copy the entire content from #mainContentWrapper down to the closing </body> tag) ... -->
   <div class="app-container">
     <div id="mainContentWrapper">
         <!-- HOME TAB CONTENT -->

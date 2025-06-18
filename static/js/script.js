@@ -1,5 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     // --- Get all relevant DOM elements ---
+    const userInfoDiv = document.getElementById('userInfo');
+    const userNameSpan = document.getElementById('userName');
     const homeContentCentered = document.getElementById('homeContentCentered');
     const homeTitleContainer = document.getElementById('homeTitleContainer');
     const homeSearchControlsContainer = document.getElementById('homeSearchControlsContainer');
@@ -17,8 +19,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const dashboardSearchError = document.getElementById('dashboardSearchError');
     const darkModeToggleButton = document.getElementById('darkModeToggle');
     const baNameSuggestions = document.getElementById('baNameSuggestions');
-
-    // Other display elements
     const baNameDisplay = document.getElementById('baNameDisplay');
     const totalRegistrationValue = document.getElementById('totalRegistrationValue');
     const totalValidFdValue = document.getElementById('totalValidFdValue');
@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let isSpecialUser = false;
     let selectedBaNamesState = [];
 
-    // --- Special User UI Functions (UNCHANGED) ---
+    // --- Special User UI Transformation Functions ---
     function switchToMultiSelectView() {
         if (document.getElementById('baNameMultiSelectWrapper')) return;
         const currentInput = document.getElementById('baNameInput');
@@ -135,15 +135,28 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // --- Initial Data Fetching ---
-    fetch('/api/user-info').then(res => res.json()).then(userInfo => {
+    function setupUIForUser(userInfo) {
         isSpecialUser = userInfo.isSpecial;
+        userNameSpan.textContent = userInfo.name;
+        userInfoDiv.style.display = 'flex';
         const activeTabButton = document.querySelector('.tab-button.active');
         if (isSpecialUser && activeTabButton && activeTabButton.id === 'homeTabBtn') {
             switchToMultiSelectView();
         }
-    }).catch(err => console.error("Could not check user privilege:", err));
+    }
 
-    populateBaNameSuggestions();
+    fetch('/api/user-info').then(res => {
+        if (res.ok) return res.json();
+        window.location.href = '/login'; 
+    }).then(userInfo => {
+        if (userInfo) {
+            setupUIForUser(userInfo);
+            populateBaNameSuggestions();
+        }
+    }).catch(err => {
+        console.error("Could not fetch user info:", err);
+        window.location.href = '/login';
+    });
     
     function populateBaNameSuggestions() {
         fetch('/api/ba-names').then(res => res.json()).then(names => {
@@ -158,40 +171,28 @@ document.addEventListener('DOMContentLoaded', function() {
         }).catch(err => console.error('Error fetching BA names:', err));
     }
     
-    // ===================================================================
-    // --- THIS IS THE CORRECTED DARK/LIGHT MODE LOGIC ---
-    // ===================================================================
+    // --- UI Management ---
     function setDarkMode(isDark) {
         if (isDark) {
             document.body.classList.remove('light-mode');
-            darkModeToggleButton.textContent = '☀️'; // Sun icon for dark mode
+            darkModeToggleButton.textContent = '☀️';
             localStorage.setItem('dashboardTheme', 'dark');
         } else {
             document.body.classList.add('light-mode');
-            darkModeToggleButton.textContent = '🌙'; // Moon icon for light mode
+            darkModeToggleButton.textContent = '🌙';
             localStorage.setItem('dashboardTheme', 'light');
         }
     }
-    
     darkModeToggleButton.addEventListener('click', () => {
-        // Toggle based on the ABSENCE of the light-mode class.
-        // If it does NOT have light-mode, it's currently dark, so we want to switch to light (isDark = false).
-        // If it DOES have light-mode, it's currently light, so we want to switch to dark (isDark = true).
         const isCurrentlyDark = !document.body.classList.contains('light-mode');
         setDarkMode(!isCurrentlyDark);
     });
-    
-    // On page load, check the stored preference
     if (localStorage.getItem('dashboardTheme') === 'light') {
-        setDarkMode(false); // Set to light mode
+        setDarkMode(false);
     } else {
-        setDarkMode(true);  // Set to dark mode (default)
+        setDarkMode(true);
     }
-    // ===================================================================
-    // --- END OF FIX ---
-    // ===================================================================
 
-    // --- The Corrected Layout Management Function ---
     window.showTab = function(tabId, clickedButton) {
         document.querySelectorAll(".tab-content").forEach(tab => tab.classList.remove('active-content'));
         document.querySelectorAll(".tab-button").forEach(btn => btn.classList.remove("active"));
@@ -210,14 +211,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
-    // --- The Corrected Search Button Logic ---
     if (searchButton) {
         searchButton.addEventListener('click', function() {
             const month = monthSelect.value;
             const week = weekSelect.value;
             const palcode = palcodeInput.value.trim();
             let baNamesToSearch;
-
             const baNameInputValue = document.getElementById('baNameInput').value.trim();
 
             if (isSpecialUser) {
@@ -281,7 +280,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- Data Handling and Display Functions (UNCHANGED) ---
     function handleSearchSuccess(data) {
         searchButton.disabled = false;
         searchButton.textContent = 'SEARCH';
