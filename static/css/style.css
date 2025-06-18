@@ -241,7 +241,7 @@ body.light-mode .status-unofficial { color: #6b7280 !important; }
   #homeArea .home-main-title { font-size: 3.5rem; }
   #homeArea .home-subtitle { font-size: 0.8rem; right: -5px; bottom: -7px;}
   #homeArea .home-search-controls-container { max-width: 350px; padding: 0 10px; box-sizing: border-box; }
-  #homeArea .home-search-controls { flex-direction: column; align-items: stretch; gap: 15px; margin-bottom: 15px; }
+  #homeArea .home-search-controls { align-items: stretch; gap: 15px; margin-bottom: 15px; }
   #homeArea .home-search-controls select, #homeArea .home-search-controls input[type="text"], #homeArea .home-search-controls .ba-input-wrapper-flex, #homeArea .home-search-controls .search-button { width: 100%; margin-bottom: 0; font-size: 1rem; box-sizing: border-box; padding: 0.75rem 0.75rem; }
   
   /* The rest of the mobile styles */
