@@ -96,28 +96,29 @@ def get_unique_ba_names():
 @app.route('/api/search', methods=['POST'])
 def search_dashboard_data():
     # ===============================================================
-    # --- THIS IS THE NEW, ROBUST HELPER FUNCTION ---
+    # --- THIS IS THE ROBUST HELPER FUNCTION FOR NUMBER CONVERSION ---
     # ===============================================================
     def to_float(value):
         """
-        Safely converts a value to a float. Handles currency symbols,
-        commas, non-string types, and empty strings.
+        Safely converts a string value to a float, handling currency symbols,
+        commas, and other non-numeric text.
         """
         if isinstance(value, (int, float)):
             return float(value)
         if not isinstance(value, str):
             return 0.0
         
-        # Clean the string by removing whitespace, currency symbols, and commas
+        # Clean the string: remove whitespace, currency symbols, and commas
         cleaned_value = value.strip().replace('₱', '').replace(',', '')
         
+        # If the string is empty after cleaning, it's zero
         if not cleaned_value:
             return 0.0
             
         try:
             return float(cleaned_value)
-        except ValueError:
-            # Return 0 if the cleaned string is still not a valid number (e.g., '-')
+        except (ValueError, TypeError):
+            # If conversion fails for any other reason (e.g., text like '-'), return 0
             return 0.0
     # ===============================================================
 
