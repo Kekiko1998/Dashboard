@@ -1,4 +1,5 @@
 import os
+import json
 from datetime import datetime, timedelta
 from flask import Flask, jsonify, render_template, request
 from google.oauth2 import service_account
@@ -10,38 +11,35 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # --- Configuration ---
 DATABASE_SHEET_ID = '1ZufXPOUcoW2czQ0vcpZwvJNHngV4GHbbSl9q46UwF8g'
-LOGS_SHEET_ID = '1ZufXPOUcoW2czQ0vcpZwvJNHngV4GHbbSl9q46UwF8g' # Update if your log sheet is different
-KEY_FILE_LOCATION = os.path.join(os.path.dirname(__file__), 'credentials.json')
+LOGS_SHEET_ID = '1ZufXPOUcoW2czQ0vcpZwvJNHngV4GHbbSl9q46UwF8g'
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
-# In a real app, this would come from a database after a user logs in.
-SPECIAL_USER_EMAILS = ['harrypobreza@gmail.com', 'official.tutansradio@gmail.com']
-
-# --- Flask App Initialization ---
-app = Flask(__name__)
-
-# --- Google API Setup ---
-# This block attempts to load the credentials file. If it fails, `creds` will be `None`,
-# and the app will log an error, preventing it from crashing but showing issues in the logs.
+# --- Environment-aware credential loading ---
+creds = None
 try:
-    creds = service_account.Credentials.from_service_account_file(KEY_FILE_LOCATION, scopes=SCOPES)
-    service = build('sheets', 'v4', credentials=creds)
-    sheet_api = service.spreadsheets()
-    logging.info("Successfully connected to Google Sheets API.")
-except FileNotFoundError:
-    logging.error(f"FATAL ERROR: The credentials.json file was not found at {KEY_FILE_LOCATION}")
-    creds = None
+    if 'GOOGLE_CREDENTIALS_JSON' in os.environ:
+        creds_json = json.loads(os.environ.get('GOOGLE_CREDENTIALS_JSON'))
+        creds = service_account.Credentials.from_service_account_info(creds_json, scopes=SCOPES)
+        logging.info("Loaded credentials from environment variable.")
+    else:
+        KEY_FILE_LOCATION = os.path.join(os.path.dirname(__file__), 'credentials.json')
+        creds = service_account.Credentials.from_service_account_file(KEY_FILE_LOCATION, scopes=SCOPES)
+        logging.info(f"Loaded credentials from file: {KEY_FILE_LOCATION}")
 except Exception as e:
-    logging.error(f"FATAL ERROR: Could not initialize Google Sheets API: {e}")
-    creds = None
+    logging.error(f"FATAL ERROR: Could not load Google credentials. {e}")
+
+# --- Flask App Initialization & API Setup ---
+app = Flask(__name__)
+service = build('sheets', 'v4', credentials=creds) if creds else None
+sheet_api = service.spreadsheets() if service else None
+
 
 # --- Helper Functions ---
 def get_all_sheet_data(sheet_id, sheet_name):
-    if not creds:
+    if not sheet_api:
         logging.error("Cannot fetch sheet data, Google API not initialized.")
         return None
     try:
-        # Fetching a fixed range is more efficient
         result = sheet_api.values().get(spreadsheetId=sheet_id, range=f"{sheet_name}!A:L").execute()
         return result.get('values', [])
     except Exception as e:
@@ -57,7 +55,6 @@ def calculate_date_range(month_name, week_str):
 
         year = datetime.now().year
         first_day_of_month = datetime(year, target_month_index, 1)
-        # Monday is 0, Sunday is 6
         days_to_subtract_for_monday = first_day_of_month.weekday()
         week1_start_date = first_day_of_month - timedelta(days=days_to_subtract_for_monday)
 
@@ -71,7 +68,7 @@ def calculate_date_range(month_name, week_str):
             return f"{start_month_name} {selected_week_start_date.day} - {selected_week_end_date.day}"
         else:
             return f"{start_month_name} {selected_week_start_date.day} - {end_month_name} {selected_week_end_date.day}"
-    except (ValueError, KeyError, AttributeError) as e:
+    except Exception as e:
         logging.error(f"Error in calculate_date_range: {e}")
         return ""
 
@@ -82,7 +79,6 @@ def index():
 
 @app.route('/api/user-info', methods=['GET'])
 def get_user_info():
-    # Placeholder for real authentication.
     return jsonify({ "email": "admin@example.com", "isSpecial": True })
 
 @app.route('/api/ba-names', methods=['GET'])
@@ -90,13 +86,8 @@ def get_unique_ba_names():
     try:
         data = get_all_sheet_data(DATABASE_SHEET_ID, 'DATABASE')
         if not data or len(data) <= 1: return jsonify([])
-
-        ba_name_column_index = 3  # Column D
-        ba_names = set()
-        for row in data[1:]: # Skip header
-            if len(row) > ba_name_column_index and row[ba_name_column_index]:
-                ba_names.add(row[ba_name_column_index].strip())
-        
+        ba_name_column_index = 3
+        ba_names = set(row[ba_name_column_index].strip() for row in data[1:] if len(row) > ba_name_column_index and row[ba_name_column_index])
         return jsonify(sorted(list(ba_names)))
     except Exception as e:
         logging.error(f"Error in get_unique_ba_names: {e}")
@@ -104,27 +95,45 @@ def get_unique_ba_names():
 
 @app.route('/api/search', methods=['POST'])
 def search_dashboard_data():
-    req_data = request.get_json()
-    month = req_data.get('month')
-    week = req_data.get('week')
-    ba_names = req_data.get('baNames', [])
-    palcode = req_data.get('palcode', '')
+    # ===============================================================
+    # --- THIS IS THE NEW, ROBUST HELPER FUNCTION ---
+    # ===============================================================
+    def to_float(value):
+        """
+        Safely converts a value to a float. Handles currency symbols,
+        commas, non-string types, and empty strings.
+        """
+        if isinstance(value, (int, float)):
+            return float(value)
+        if not isinstance(value, str):
+            return 0.0
+        
+        # Clean the string by removing whitespace, currency symbols, and commas
+        cleaned_value = value.strip().replace('₱', '').replace(',', '')
+        
+        if not cleaned_value:
+            return 0.0
+            
+        try:
+            return float(cleaned_value)
+        except ValueError:
+            # Return 0 if the cleaned string is still not a valid number (e.g., '-')
+            return 0.0
+    # ===============================================================
 
+    req_data = request.get_json()
+    month, week, ba_names, palcode = req_data.get('month'), req_data.get('week'), req_data.get('baNames', []), req_data.get('palcode', '')
     is_special_user = True
     
-    if not month or not week:
-        return jsonify({"error": "Month and Week are required search criteria."}), 400
-    if not is_special_user and not ba_names:
-        return jsonify({"error": "BA Name is required for your search."}), 400
+    if not month or not week: return jsonify({"error": "Month and Week are required search criteria."}), 400
+    if not is_special_user and not ba_names: return jsonify({"error": "BA Name is required for your search."}), 400
     
     all_sheet_data = get_all_sheet_data(DATABASE_SHEET_ID, 'DATABASE')
-    if all_sheet_data is None:
-        return jsonify({"error": "Database sheet not found or API connection failed."}), 500
+    if all_sheet_data is None: return jsonify({"error": "Database sheet not found or API connection failed."}), 500
         
     log_user_event('searchDashboardData', req_data)
 
-    search_month = month.strip().lower()
-    search_week = week.strip().lower()
+    search_month, search_week = month.strip().lower(), week.strip().lower()
     search_ba_names_lower = [str(name).strip().lower() for name in ba_names if name]
     search_palcode_lower = palcode.strip().lower() if palcode else ""
 
@@ -132,80 +141,56 @@ def search_dashboard_data():
 
     period_data_rows = [row for row in all_sheet_data[1:] if len(row) > WEEK and row[MONTH].strip().lower() == search_month and row[WEEK].strip().lower() == search_week]
 
-    ba_display_name = "N/A"
-    if len(search_ba_names_lower) == 1:
-        ba_display_name = ba_names[0].strip().upper()
-    elif len(search_ba_names_lower) > 1:
-        ba_display_name = f"MULTIPLE BAs ({len(search_ba_names_lower)})"
-    elif is_special_user:
-        ba_display_name = "ALL BAs"
-
+    ba_display_name = "ALL BAs" if is_special_user and not search_ba_names_lower else (f"MULTIPLE BAs ({len(search_ba_names_lower)})" if len(search_ba_names_lower) > 1 else (ba_names[0].strip().upper() if search_ba_names_lower else "N/A"))
+    
     search_criteria_frontend = {'baNames': [name.strip().upper() for name in ba_names]}
     date_range_display = calculate_date_range(month, week)
 
     if not period_data_rows:
-        return jsonify({
-            "baNameDisplay": ba_display_name, "searchCriteria": search_criteria_frontend,
-            "summary": {"totalRegistration": 0, "totalValidFd": 0, "totalSuspended": 0, "totalSalary": 0, "totalIncentives": 0},
-            "monthDisplay": search_month.upper(), "weekDisplay": search_week.upper(), "dateRangeDisplay": date_range_display,
-            "status": "N/A", "resultsTable": [], "rankedBaList": [], "lastUpdate": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            "message": "No matching records found for the selected period."
-        })
+        return jsonify({ "baNameDisplay": ba_display_name, "searchCriteria": search_criteria_frontend, "summary": {"totalRegistration": 0, "totalValidFd": 0, "totalSuspended": 0, "totalSalary": 0, "totalIncentives": 0}, "monthDisplay": search_month.upper(), "weekDisplay": search_week.upper(), "dateRangeDisplay": date_range_display, "status": "N/A", "resultsTable": [], "rankedBaList": [], "lastUpdate": datetime.now().strftime('%Y-%m-%d %H:%M:%S'), "message": "No matching records found for the selected period." })
 
-    overall_total_valid_fd = 0
-    ba_period_fds = {}
+    overall_total_valid_fd, ba_period_fds = 0, {}
     for row in period_data_rows:
         try:
-            current_fd = float(row[VALID_FD]) if len(row) > VALID_FD and row[VALID_FD] else 0
+            current_fd = to_float(row[VALID_FD]) if len(row) > VALID_FD else 0
             overall_total_valid_fd += current_fd
             ba_name = row[BA_NAME].strip() if len(row) > BA_NAME and row[BA_NAME] else "Unknown BA"
             if ba_name not in ba_period_fds:
                 ba_period_fds[ba_name] = {"originalName": ba_name, "totalFd": 0}
             ba_period_fds[ba_name]["totalFd"] += current_fd
-        except (ValueError, IndexError):
-            continue
+        except (ValueError, IndexError): continue
 
     final_ranked_ba_list = sorted(ba_period_fds.values(), key=lambda x: x['totalFd'], reverse=True)
     
-    ba_incentives_map = {}
-    sum_of_all_individual_incentives = 0
+    ba_incentives_map, sum_of_all_individual_incentives = {}, 0
     if overall_total_valid_fd >= 6000:
         for i, ba in enumerate(final_ranked_ba_list):
-            rank = i + 1
-            incentive = 0
+            rank, incentive = i + 1, 0
             if rank == 1: incentive = 3000
             elif rank == 2: incentive = 1500
             elif rank == 3: incentive = 900
             elif 4 <= rank <= 6: incentive = 500
-            elif 7 <= rank <= 10: incentive = 200
-            elif rank > 10 and ba['totalFd'] > 0: incentive = 200
-            
+            elif rank > 6 and ba['totalFd'] > 0: incentive = 200
             if incentive > 0:
                 ba_incentives_map[ba['originalName'].upper()] = incentive
                 sum_of_all_individual_incentives += incentive
 
-    filtered_rows = []
-    for row in period_data_rows:
-        row_ba_name = row[BA_NAME].strip().lower() if len(row) > BA_NAME and row[BA_NAME] else ""
-        row_palcode = row[PALCODE].strip().lower() if len(row) > PALCODE and row[PALCODE] else ""
-        
-        ba_name_matches = (not search_ba_names_lower) or (row_ba_name in search_ba_names_lower)
-        palcode_matches = (not search_palcode_lower) or (row_palcode == search_palcode_lower)
-        
-        if ba_name_matches and palcode_matches:
-            filtered_rows.append(row)
+    filtered_rows = [row for row in period_data_rows if ((not search_ba_names_lower or (len(row) > BA_NAME and row[BA_NAME].strip().lower() in search_ba_names_lower)) and (not search_palcode_lower or (len(row) > PALCODE and row[PALCODE].strip().lower() == search_palcode_lower)))]
 
-    results_for_table = []
-    summary_for_display = {"totalRegistration": 0, "totalValidFd": 0, "totalSuspended": 0, "totalSalary": 0, "totalIncentives": 0}
+    results_for_table, summary_for_display = [], {"totalRegistration": 0, "totalValidFd": 0, "totalSuspended": 0, "totalSalary": 0, "totalIncentives": 0}
 
     for row in filtered_rows:
         try:
             results_for_table.append([row[i] if len(row) > i else "" for i in [PALCODE, BA_NAME, REG, VALID_FD, SUSPENDED_FD, RATE, GGR_PER_FD, TOTAL_GGR, SALARY, STATUS]])
-            summary_for_display['totalRegistration'] += float(row[REG]) if len(row) > REG and row[REG] else 0
-            summary_for_display['totalValidFd'] += float(row[VALID_FD]) if len(row) > VALID_FD and row[VALID_FD] else 0
-            summary_for_display['totalSuspended'] += float(row[SUSPENDED_FD]) if len(row) > SUSPENDED_FD and row[SUSPENDED_FD] else 0
-            summary_for_display['totalSalary'] += float(row[SALARY]) if len(row) > SALARY and row[SALARY] else 0
-        except (ValueError, IndexError):
+            
+            # Use the new robust helper for ALL calculations
+            summary_for_display['totalRegistration'] += to_float(row[REG]) if len(row) > REG else 0
+            summary_for_display['totalValidFd'] += to_float(row[VALID_FD]) if len(row) > VALID_FD else 0
+            summary_for_display['totalSuspended'] += to_float(row[SUSPENDED_FD]) if len(row) > SUSPENDED_FD else 0
+            summary_for_display['totalSalary'] += to_float(row[SALARY]) if len(row) > SALARY else 0
+
+        except IndexError as e:
+            logging.warning(f"Skipping row due to missing columns: {row} -> {e}")
             continue
             
     if overall_total_valid_fd >= 6000:
@@ -215,40 +200,22 @@ def search_dashboard_data():
         elif is_special_user:
             summary_for_display['totalIncentives'] = sum_of_all_individual_incentives
 
-    return jsonify({
-        "baNameDisplay": ba_display_name, "searchCriteria": search_criteria_frontend,
-        "summary": summary_for_display, "monthDisplay": search_month.upper(),
-        "weekDisplay": search_week.upper(), "dateRangeDisplay": date_range_display,
-        "status": "Active", "resultsTable": results_for_table,
-        "rankedBaList": final_ranked_ba_list, "lastUpdate": datetime.now().strftime('%A, %B %d, %Y, %I:%M:%S %p')
-    })
+    return jsonify({ "baNameDisplay": ba_display_name, "searchCriteria": search_criteria_frontend, "summary": summary_for_display, "monthDisplay": search_month.upper(), "weekDisplay": search_week.upper(), "dateRangeDisplay": date_range_display, "status": "Active", "resultsTable": results_for_table, "rankedBaList": final_ranked_ba_list, "lastUpdate": datetime.now().strftime('%A, %B %d, %Y, %I:%M:%S %p') })
 
 def log_user_event(function_name, inputs):
-    if not creds: return
+    if not sheet_api: return
     try:
-        now = datetime.now()
-        timestamp = now.strftime('%A, %B %d, %Y, %I:%M:%S %p')
+        timestamp = datetime.now().strftime('%A, %B %d, %Y, %I:%M:%S %p')
         user_email = "admin@example.com"
-        
         ba_names_str = ', '.join(inputs.get('baNames', [])) if inputs.get('baNames') else "N/A"
-        formatted_inputs = (
-            f"Month - {inputs.get('month', 'N/A')}, "
-            f"Week - {inputs.get('week', 'N/A').replace('week ', '')}, "
-            f"Ba Name(s) - {ba_names_str}, "
-            f"Palcode - {inputs.get('palcode', 'N/A') or 'N/A'}"
-        )
+        formatted_inputs = f"Month - {inputs.get('month', 'N/A')}, Week - {inputs.get('week', 'N/A').replace('week ', '')}, Ba Name(s) - {ba_names_str}, Palcode - {inputs.get('palcode', 'N/A') or 'N/A'}"
         row_to_append = [timestamp, user_email, function_name, formatted_inputs]
-        
-        sheet_api.values().append(
-            spreadsheetId=LOGS_SHEET_ID, range='Web App Logs!A1',
-            valueInputOption='USER_ENTERED', body={'values': [row_to_append]}
-        ).execute()
+        sheet_api.values().append(spreadsheetId=LOGS_SHEET_ID, range='Web App Logs!A1', valueInputOption='USER_ENTERED', body={'values': [row_to_append]}).execute()
     except Exception as e:
         logging.error(f"Error logging event: {e}")
 
-# This block is only for running the app locally on your own computer.
-# Render's server (Gunicorn) will run the 'app' object directly and will ignore this.
 if __name__ == '__main__':
-    # The 'debug=True' is very helpful for local development but should be
-    # turned off in a real production environment for security.
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    if not creds:
+        logging.error("Application cannot start because Google API connection failed. Please check credentials.")
+    else:
+        app.run(host='0.0.0.0', port=5001, debug=True)
