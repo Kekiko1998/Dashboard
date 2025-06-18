@@ -10,8 +10,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # --- Configuration ---
 DATABASE_SHEET_ID = '1ZufXPOUcoW2czQ0vcpZwvJNHngV4GHbbSl9q46UwF8g'
-# IMPORTANT: If your log sheet is different, update this ID
-LOGS_SHEET_ID = '1ZufXPOUcoW2czQ0vcpZwvJNHngV4GHbbSl9q46UwF8g'
+LOGS_SHEET_ID = '1ZufXPOUcoW2czQ0vcpZwvJNHngV4GHbbSl9q46UwF8g' # Update if your log sheet is different
 KEY_FILE_LOCATION = os.path.join(os.path.dirname(__file__), 'credentials.json')
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
@@ -22,6 +21,8 @@ SPECIAL_USER_EMAILS = ['harrypobreza@gmail.com', 'official.tutansradio@gmail.com
 app = Flask(__name__)
 
 # --- Google API Setup ---
+# This block attempts to load the credentials file. If it fails, `creds` will be `None`,
+# and the app will log an error, preventing it from crashing but showing issues in the logs.
 try:
     creds = service_account.Credentials.from_service_account_file(KEY_FILE_LOCATION, scopes=SCOPES)
     service = build('sheets', 'v4', credentials=creds)
@@ -82,18 +83,13 @@ def index():
 @app.route('/api/user-info', methods=['GET'])
 def get_user_info():
     # Placeholder for real authentication.
-    # For now, we assume a "special user" is using the app.
-    return jsonify({
-        "email": "admin@example.com",
-        "isSpecial": True 
-    })
+    return jsonify({ "email": "admin@example.com", "isSpecial": True })
 
 @app.route('/api/ba-names', methods=['GET'])
 def get_unique_ba_names():
     try:
         data = get_all_sheet_data(DATABASE_SHEET_ID, 'DATABASE')
-        if not data or len(data) <= 1:
-            return jsonify([])
+        if not data or len(data) <= 1: return jsonify([])
 
         ba_name_column_index = 3  # Column D
         ba_names = set()
@@ -250,8 +246,9 @@ def log_user_event(function_name, inputs):
     except Exception as e:
         logging.error(f"Error logging event: {e}")
 
+# This block is only for running the app locally on your own computer.
+# Render's server (Gunicorn) will run the 'app' object directly and will ignore this.
 if __name__ == '__main__':
-    if not creds:
-        logging.error("Application cannot start because Google API connection failed. Please check credentials.json.")
-    else:
-        app.run(host='0.0.0.0', port=5001, debug=True)
+    # The 'debug=True' is very helpful for local development but should be
+    # turned off in a real production environment for security.
+    app.run(host='0.0.0.0', port=5001, debug=True)
