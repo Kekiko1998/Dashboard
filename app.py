@@ -1,5 +1,6 @@
 import os
 import json
+import hashlib
 from datetime import datetime, timedelta
 from flask import Flask, jsonify, render_template, request, redirect, url_for, session
 from flask_login import LoginManager, current_user, login_required, login_user, logout_user, UserMixin
@@ -8,7 +9,7 @@ from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import Flow
 import logging
 import requests
-import pytz  # <--- NEW: Import the timezone library
+import pytz
 
 # --- Basic Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -18,7 +19,18 @@ DATABASE_SHEET_ID = '1ZufXPOUcoW2czQ0vcpZwvJNHngV4GHbbSl9q46UwF8g'
 LOGS_SHEET_ID = '1ZufXPOUcoW2czQ0vcpZwvJNHngV4GHbbSl9q46UwF8g'
 SCOPES_SERVICE_ACCOUNT = ['https://www.googleapis.com/auth/spreadsheets']
 SPECIAL_USER_EMAILS = ['harrypobreza@gmail.com', 'official.tutansradio@gmail.com']
-YOUR_TIMEZONE = 'Asia/Manila' # <--- NEW: Set your local timezone (e.g., Philippines)
+YOUR_TIMEZONE = 'Asia/Manila'
+
+# ===============================================================
+# --- NEW: In-memory cache for storing timestamps and data hashes ---
+# ===============================================================
+# In a real-world, multi-server app, you'd use a database like Redis for this.
+# For this single-instance app, a simple dictionary is perfect.
+# The key will be a combination of month and week (e.g., "june-week 3")
+# The value will be another dictionary: {'hash': '...', 'timestamp': '...'}
+timestamp_cache = {}
+# ===============================================================
+
 
 # --- Flask App Initialization ---
 app = Flask(__name__)
@@ -155,17 +167,39 @@ def search_dashboard_data():
     PALCODE, MONTH, WEEK, BA_NAME, REG, VALID_FD, SUSPENDED_FD, RATE, GGR_PER_FD, TOTAL_GGR, SALARY, STATUS = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
     period_data_rows = [row for row in all_sheet_data[1:] if len(row) > WEEK and row[MONTH].strip().lower() == search_month and row[WEEK].strip().lower() == search_week]
     
-    ba_display_name = "ALL BAs" if is_special_user and not search_ba_names_lower else (f"MULTIPLE BAs ({len(search_ba_names_lower)})" if len(search_ba_names_lower) > 1 else (ba_names[0].strip().upper() if search_ba_names_lower else "N/A"))
-    search_criteria_frontend = {'baNames': [name.strip().upper() for name in ba_names]}
-    date_range_display = calculate_date_range(month, week)
-    
-    # ======================= THIS IS THE FIX =======================
-    # Get the current time in UTC, then convert it to your local timezone
-    utc_now = datetime.now(pytz.utc)
-    local_tz = pytz.timezone(YOUR_TIMEZONE)
-    local_now = utc_now.astimezone(local_tz)
-    last_update_timestamp = local_now.strftime('%A, %B %d, %Y, %I:%M:%S %p')
     # ===============================================================
+    # --- THIS IS THE NEW TIMESTAMP AND HASHING LOGIC ---
+    # ===============================================================
+    cache_key = f"{search_month}-{search_week}"
+    
+    # Create a hash (fingerprint) of the relevant data
+    # We convert the list of lists to a string to hash it
+    current_data_str = json.dumps(period_data_rows, sort_keys=True)
+    current_hash = hashlib.md5(current_data_str.encode('utf-8')).hexdigest()
+
+    # Get the previous hash and timestamp from our cache
+    last_known_data = timestamp_cache.get(cache_key)
+    
+    last_update_timestamp = ""
+
+    if last_known_data and last_known_data['hash'] == current_hash:
+        # Data has NOT changed, so we use the OLD timestamp
+        last_update_timestamp = last_known_data['timestamp']
+        logging.info(f"Data for {cache_key} has not changed. Using cached timestamp.")
+    else:
+        # Data IS new or has changed. Generate a NEW timestamp and update the cache.
+        utc_now = datetime.now(pytz.utc)
+        local_tz = pytz.timezone(YOUR_TIMEZONE)
+        local_now = utc_now.astimezone(local_tz)
+        last_update_timestamp = local_now.strftime('%A, %B %d, %Y, %I:%M:%S %p')
+        
+        # Store the new hash and timestamp in our cache
+        timestamp_cache[cache_key] = {'hash': current_hash, 'timestamp': last_update_timestamp}
+        logging.info(f"Data for {cache_key} has changed. Caching new timestamp.")
+    # ===============================================================
+
+    ba_display_name = "ALL BAs" if is_special_user and not search_ba_names_lower else (f"MULTIPLE BAs ({len(search_ba_names_lower)})" if len(search_ba_names_lower) > 1 else (ba_names[0].strip().upper() if search_ba_names_lower else "N/A"))
+    search_criteria_frontend, date_range_display = {'baNames': [name.strip().upper() for name in ba_names]}, calculate_date_range(month, week)
 
     if not period_data_rows:
         return jsonify({ "baNameDisplay": ba_display_name, "searchCriteria": search_criteria_frontend, "summary": {"totalRegistration": 0, "totalValidFd": 0, "totalSuspended": 0, "totalSalary": 0, "totalIncentives": 0}, "monthDisplay": search_month.upper(), "weekDisplay": search_week.upper(), "dateRangeDisplay": date_range_display, "status": "N/A", "resultsTable": [], "rankedBaList": [], "lastUpdate": last_update_timestamp, "message": "No records for selected period." })
@@ -214,13 +248,10 @@ def search_dashboard_data():
 def log_user_event(function_name, inputs):
     if not sheet_api: return
     try:
-        # Also fix the logging timestamp to use the correct timezone
-        utc_now = datetime.now(pytz.utc)
-        local_tz = pytz.timezone(YOUR_TIMEZONE)
+        utc_now, local_tz = datetime.now(pytz.utc), pytz.timezone(YOUR_TIMEZONE)
         local_now = utc_now.astimezone(local_tz)
         timestamp = local_now.strftime('%A, %B %d, %Y, %I:%M:%S %p')
         user_email = current_user.email if current_user.is_authenticated else "Anonymous"
-        
         ba_names_str = ', '.join(inputs.get('baNames', [])) if inputs.get('baNames') else "N/A"
         formatted_inputs = f"Month - {inputs.get('month', 'N/A')}, Week - {inputs.get('week', 'N/A').replace('week ', '')}, Ba Name(s) - {ba_names_str}, Palcode - {inputs.get('palcode', 'N/A') or 'N/A'}"
         row_to_append = [timestamp, user_email, function_name, formatted_inputs]
