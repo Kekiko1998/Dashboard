@@ -222,7 +222,7 @@ body.light-mode .status-unofficial { color: #6b7280 !important; }
   }
   .user-info { gap: 0.5rem; }
   .user-name { display: none; } /* Hide name on mobile to save space */
-  .logout-button { font-size: 14.9px; }
+  .logout-button { font-size: 10.9px; }
   
   /* Style search controls when they are in the top bar */
   .top-left-dynamic-content .home-title-container { text-align: center; margin-bottom: 5px; white-space: normal; }
