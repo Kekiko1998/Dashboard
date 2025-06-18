@@ -19,24 +19,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const dashboardSearchError = document.getElementById('dashboardSearchError');
     const darkModeToggleButton = document.getElementById('darkModeToggle');
     const baNameSuggestions = document.getElementById('baNameSuggestions');
-    const baNameDisplay = document.getElementById('baNameDisplay');
-    const totalRegistrationValue = document.getElementById('totalRegistrationValue');
-    const totalValidFdValue = document.getElementById('totalValidFdValue');
-    const totalSuspendedValue = document.getElementById('totalSuspendedValue');
-    const totalSalaryValue = document.getElementById('totalSalaryValue');
-    const totalIncentiveValue = document.getElementById('totalIncentiveValue');
-    const baRankingListDiv = document.getElementById('baRankingList');
-    const monthDisplay = document.getElementById('monthDisplay');
-    const weekDisplay = document.getElementById('weekDisplay');
-    const statusValue = document.getElementById('statusValue');
-    const resultsTableContainer = document.getElementById('resultsTableContainer');
-    const lastUpdateValue = document.getElementById('lastUpdateValue');
-    const dateRangeDisplay = document.getElementById('dateRangeDisplay');
 
+    // All other element selectors are correct, no changes needed here.
+    
     let isSpecialUser = false;
     let selectedBaNamesState = [];
 
-    // --- Special User UI Transformation Functions ---
+    // --- Special User UI Functions (No changes needed here) ---
     function switchToMultiSelectView() {
         if (document.getElementById('baNameMultiSelectWrapper')) return;
         const currentInput = document.getElementById('baNameInput');
@@ -71,16 +60,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         input.removeEventListener('keydown', handleMultiSelectKeyDown);
     }
-
-    function handleMultiSelectKeyDown(e) {
-        if (e.key === 'Enter' && baNameInput.value.trim() !== '') {
-            e.preventDefault();
-            addTag(baNameInput.value.trim(), true);
-            baNameInput.value = '';
-        }
-    }
+    function handleMultiSelectKeyDown(e) { if (e.key === 'Enter' && baNameInput.value.trim() !== '') { e.preventDefault(); addTag(baNameInput.value.trim(), true); baNameInput.value = ''; } }
     function handleWrapperClick(e) { if (e.target.id === 'baNameMultiSelectWrapper') { baNameInput.focus(); } }
-    
     function updateVisibleTags() {
         const wrapper = document.getElementById('baNameMultiSelectWrapper');
         if (!wrapper) return;
@@ -103,7 +84,6 @@ document.addEventListener('DOMContentLoaded', function() {
             baNameInput.classList.remove('placeholder-hidden');
         }
     }
-
     function addTag(name, updateStateArray) {
         if (updateStateArray) {
             const lowerCaseName = name.toLowerCase();
@@ -144,7 +124,6 @@ document.addEventListener('DOMContentLoaded', function() {
             switchToMultiSelectView();
         }
     }
-
     fetch('/api/user-info').then(res => {
         if (res.ok) return res.json();
         window.location.href = '/login'; 
@@ -218,7 +197,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const palcode = palcodeInput.value.trim();
             let baNamesToSearch;
             const baNameInputValue = document.getElementById('baNameInput').value.trim();
-
             if (isSpecialUser) {
                 if (document.getElementById('baNameMultiSelectWrapper')) {
                     if (baNameInputValue !== '') {
@@ -232,7 +210,6 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 baNamesToSearch = baNameInputValue ? [baNameInputValue] : [];
             }
-
             const errorTarget = document.getElementById('homeErrorMessage');
             errorTarget.textContent = ''; 
             let missingFields = [];
@@ -241,12 +218,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!isSpecialUser && baNamesToSearch.length === 0) {
                 missingFields.push("BA NAME");
             }
-
             if (missingFields.length > 0) {
                 errorTarget.textContent = `❌ Please select: ${missingFields.join(', ')}.`;
                 return;
             }
-
             searchButton.disabled = true;
             searchButton.textContent = 'SEARCHING...';
             showTab('dashboardDisplayArea', dashboardTabBtn); 
@@ -254,14 +229,7 @@ document.addEventListener('DOMContentLoaded', function() {
             dashboardDataDisplay.style.display = 'none';
             dashboardSearchError.style.display = 'none';
             loadingIndicator.style.display = 'flex';
-
-            const searchPayload = {
-                month: month,
-                week: week,
-                baNames: baNamesToSearch,
-                palcode: palcode
-            };
-
+            const searchPayload = { month: month, week: week, baNames: baNamesToSearch, palcode: palcode };
             fetch('/api/search', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -280,6 +248,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // --- Data Handling and Display Functions ---
     function handleSearchSuccess(data) {
         searchButton.disabled = false;
         searchButton.textContent = 'SEARCH';
@@ -291,9 +260,7 @@ document.addEventListener('DOMContentLoaded', function() {
             dashboardDataDisplay.style.display = 'none';
             return;
         }
-
         const hasData = (data.resultsTable && data.resultsTable.length > 0) || (data.summary && data.summary.totalValidFd > 0);
-        
         if (hasData) {
             dashboardSearchError.style.display = 'none';
             populateDashboardWithData(data);
@@ -335,7 +302,24 @@ document.addEventListener('DOMContentLoaded', function() {
         return { text: 'MIXED', class: '' };
     }
 
+    // ===============================================================
+    // --- THIS IS THE CORRECTED populateDashboardWithData FUNCTION ---
+    // ===============================================================
     function populateDashboardWithData(data) {
+        const baNameDisplay = document.getElementById('baNameDisplay');
+        const totalRegistrationValue = document.getElementById('totalRegistrationValue');
+        const totalValidFdValue = document.getElementById('totalValidFdValue');
+        const totalSuspendedValue = document.getElementById('totalSuspendedValue');
+        const totalSalaryValue = document.getElementById('totalSalaryValue');
+        const totalIncentiveValue = document.getElementById('totalIncentiveValue');
+        const monthDisplay = document.getElementById('monthDisplay');
+        const weekDisplay = document.getElementById('weekDisplay');
+        const dateRangeDisplay = document.getElementById('dateRangeDisplay');
+        const statusValue = document.getElementById('statusValue');
+        const lastUpdateValue = document.getElementById('lastUpdateValue'); // Correctly get the element
+        const baRankingListDiv = document.getElementById('baRankingList');
+        const resultsTableContainer = document.getElementById('resultsTableContainer');
+
         if(baNameDisplay) {
             baNameDisplay.innerHTML = '';
             baNameDisplay.className = 'ba-name-display';
@@ -385,7 +369,12 @@ document.addEventListener('DOMContentLoaded', function() {
             statusValue.textContent = summaryStatus.text;
             statusValue.className = summaryStatus.class;
         }
-        if(lastUpdateValue) lastUpdateValue.textContent = data.lastUpdate || "N/A";
+
+        // --- THIS IS THE FIX ---
+        if(lastUpdateValue) {
+            lastUpdateValue.textContent = data.lastUpdate || "N/A";
+        }
+        // -----------------------
         
         if (baRankingListDiv) {
             baRankingListDiv.innerHTML = ''; 
@@ -413,47 +402,49 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        if(resultsTableContainer) resultsTableContainer.innerHTML = '';
-        if (data.resultsTable && data.resultsTable.length > 0) {
-            const table = document.createElement('table');
-            const thead = document.createElement('thead');
-            const tbody = document.createElement('tbody');
-            const headerRow = document.createElement('tr');
-            const headers = ['PALCODE','BA Name','REG','Valid FD','Suspended FD','Rate','GGR Per FD','Total GGR','SALARY','Status'];
-            const thNo = document.createElement('th'); thNo.textContent = 'No.'; headerRow.appendChild(thNo);
-            headers.forEach(text => { const th = document.createElement('th'); th.textContent = text.toUpperCase(); headerRow.appendChild(th); });
-            thead.appendChild(headerRow); table.appendChild(thead);
-            const statusColumnDataIndex = 9; 
-            const rippleDelayIncrement = 0.05;
-            data.resultsTable.forEach((rowData, rowIndex) => {
-                const tr = document.createElement('tr');
-                tr.classList.add('result-row-animate'); tr.style.animationDelay = `${rowIndex * rippleDelayIncrement}s`;
-                const tdNo = document.createElement('td'); tdNo.textContent = rowIndex + 1; tr.appendChild(tdNo);
-                rowData.forEach((cellData, cellIndex) => {
-                    const td = document.createElement('td');
-                    const formattedCell = (cellData === null || cellData === undefined) ? '' : cellData;
-                    td.textContent = formattedCell;
-                    if (cellIndex === statusColumnDataIndex) {
-                        let statusClass = '';
-                        const statusText = formattedCell.toString().trim().toLowerCase().replace(/\s+/g, '-');
-                        switch (statusText) {
-                            case 'paid': statusClass = 'status-paid'; break;
-                            case 'on-going': statusClass = 'status-on-going'; break;
-                            case 'delayed': statusClass = 'status-delayed'; break;
-                            case 'updating': statusClass = 'status-updating'; break;
-                            case 'invalid': statusClass = 'status-invalid'; break;
-                            case 'unofficial': statusClass = 'status-unofficial'; break;
+        if(resultsTableContainer) {
+            resultsTableContainer.innerHTML = '';
+            if (data.resultsTable && data.resultsTable.length > 0) {
+                const table = document.createElement('table');
+                const thead = document.createElement('thead');
+                const tbody = document.createElement('tbody');
+                const headerRow = document.createElement('tr');
+                const headers = ['PALCODE','BA Name','REG','Valid FD','Suspended FD','Rate','GGR Per FD','Total GGR','SALARY','Status'];
+                const thNo = document.createElement('th'); thNo.textContent = 'No.'; headerRow.appendChild(thNo);
+                headers.forEach(text => { const th = document.createElement('th'); th.textContent = text.toUpperCase(); headerRow.appendChild(th); });
+                thead.appendChild(headerRow); table.appendChild(thead);
+                const statusColumnDataIndex = 9; 
+                const rippleDelayIncrement = 0.05;
+                data.resultsTable.forEach((rowData, rowIndex) => {
+                    const tr = document.createElement('tr');
+                    tr.classList.add('result-row-animate'); tr.style.animationDelay = `${rowIndex * rippleDelayIncrement}s`;
+                    const tdNo = document.createElement('td'); tdNo.textContent = rowIndex + 1; tr.appendChild(tdNo);
+                    rowData.forEach((cellData, cellIndex) => {
+                        const td = document.createElement('td');
+                        const formattedCell = (cellData === null || cellData === undefined) ? '' : cellData;
+                        td.textContent = formattedCell;
+                        if (cellIndex === statusColumnDataIndex) {
+                            let statusClass = '';
+                            const statusText = formattedCell.toString().trim().toLowerCase().replace(/\s+/g, '-');
+                            switch (statusText) {
+                                case 'paid': statusClass = 'status-paid'; break;
+                                case 'on-going': statusClass = 'status-on-going'; break;
+                                case 'delayed': statusClass = 'status-delayed'; break;
+                                case 'updating': statusClass = 'status-updating'; break;
+                                case 'invalid': statusClass = 'status-invalid'; break;
+                                case 'unofficial': statusClass = 'status-unofficial'; break;
+                            }
+                            if (statusClass) td.classList.add(statusClass);
                         }
-                        if (statusClass) td.classList.add(statusClass);
-                    }
-                    tr.appendChild(td);
+                        tr.appendChild(td);
+                    });
+                    tbody.appendChild(tr);
                 });
-                tbody.appendChild(tr);
-            });
-            table.appendChild(tbody);
-            if(resultsTableContainer) resultsTableContainer.appendChild(table);
-        } else {
-             if(resultsTableContainer) resultsTableContainer.innerHTML = `<p class="no-data-message">${data.message || 'Summary data is shown in the left panel. No detailed records for this query.'}</p>`;
+                table.appendChild(tbody);
+                resultsTableContainer.appendChild(table);
+            } else {
+                 resultsTableContainer.innerHTML = `<p class="no-data-message">${data.message || 'Summary data is shown in the left panel. No detailed records for this query.'}</p>`;
+            }
         }
 
         if(dashboardDataDisplay) {
@@ -463,7 +454,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 50);
         }
     }
-
+    // ===============================================================
+    
     function animateValue(element, start, end, duration, isCurrency = false) {
         if (!element || typeof end !== 'number' || isNaN(end)) {
              if(element && isCurrency) element.textContent = `₱ 0.00`;
