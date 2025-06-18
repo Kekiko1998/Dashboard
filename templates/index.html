@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <title>Dashboard & Payout Scheme</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- REVERTED: Restored original font links -->
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@400;700&family=Lexend:wght@700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Anton&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <!-- The rest of your HTML structure is exactly the same as the last correct version -->
+  <!-- Tab Navigation & Dark Mode Toggle -->
+  <div class="top-navigation">
+    <div id="topLeftDynamicContent" class="top-left-dynamic-content">
+        <!-- JS will move title/search controls here when not on the Home tab -->
+    </div>
+    <div class="tabs-and-toggle-container">
+        <div class="tabs">
+            <button id="homeTabBtn" class="tab-button active" onclick="showTab('homeArea', this)">Home</button>
+            <button id="dashboardTabBtn" class="tab-button" onclick="showTab('dashboardDisplayArea', this)">Dashboard</button>
+            <button id="salaryTabBtn" class="tab-button" onclick="showTab('salarySchemeArea', this)">Salary Scheme</button>
+        </div>
+        <button id="darkModeToggle" title="Toggle Dark/Light Mode">☀️</button>
+    </div>
+  </div>
+
+  <div class="app-container">
+    <div id="mainContentWrapper">
+        <!-- HOME TAB CONTENT -->
+        <div id="homeArea" class="tab-content active-content">
+            <div id="homeContentCentered" class="home-content-centered">
+                <!-- Title and Search controls start here by default -->
+                <div id="homeTitleContainer" class="home-title-container">
+                    <h1 class="home-main-title">DASHBOARD</h1>
+                    <span class="home-subtitle">By Love</span>
+                </div>
+                <div id="homeSearchControlsContainer" class="home-search-controls-container">
+                    <div class="home-search-controls">
+                        <select id="monthSelect">
+                            <option value="" disabled selected>SELECT MONTH</option>
+                            <option value="January">January</option><option value="February">February</option><option value="March">March</option><option value="April">April</option><option value="May">May</option><option value="June">June</option><option value="July">July</option><option value="August">August</option><option value="September">September</option><option value="October">October</option><option value="November">November</option><option value="December">December</option>
+                        </select>
+                        <select id="weekSelect">
+                            <option value="" disabled selected>SELECT WEEK</option>
+                            <option value="Week 1">Week 1</option><option value="Week 2">Week 2</option><option value="Week 3">Week 3</option><option value="Week 4">Week 4</option>
+                        </select>
+                        <input type="text" id="baNameInput" placeholder="ENTER BA NAME" autocomplete="off" list="baNameSuggestions">
+                        <datalist id="baNameSuggestions"></datalist>
+                        <input type="text" id="palcodeInput" placeholder="ENTER PALCODE (OPTIONAL)">
+                        <button id="searchButton" class="search-button">SEARCH</button>
+                    </div>
+                    <div id="homeErrorMessage" class="error-message-main"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DASHBOARD TAB CONTENT -->
+        <div id="dashboardDisplayArea" class="tab-content">
+            <div id="dashboardPlaceholder" class="dashboard-placeholder-message">
+                <p> 🔎 Please perform a search to view dashboard data.</p>
+            </div>
+            <div id="loadingIndicator" class="loading-indicator" style="display: none;">
+                ⏳ Fetching dashboard data, please wait...
+            </div>
+            <div id="dashboardSearchError" class="dashboard-placeholder-message" style="display: none; color: orange;">
+                <p>⚠️ No data found for the selected criteria, or the search parameters were insufficient.</p>
+            </div>
+            <div id="dashboardDataDisplay" class="dashboard-content-area" style="display: none;">
+              <div class="left-panel">
+                <div id="baNameDisplay" class="ba-name-display"></div>
+                <div class="summary-section"><h4>SUMMARY</h4></div>
+                <div class="summary-cards-container">
+                  <div class="summary-card"><span class="summary-label">TOTAL REG</span><span class="summary-value" id="totalRegistrationValue">0</span></div>
+                  <div class="summary-card"><span class="summary-label">TOTAL VALID FD</span><span class="summary-value" id="totalValidFdValue">0</span></div>
+                  <div class="summary-card"><span class="summary-label">TOTAL SUSPENDED</span><span class="summary-value" id="totalSuspendedValue">0</span></div>
+                  <div class="summary-card"><span class="summary-label">TOTAL SALARY</span><span class="summary-value" id="totalSalaryValue">0</span></div>
+                  <div class="summary-card"><span class="summary-label">INCENTIVES</span><span class="summary-value" id="totalIncentiveValue">₱0.00</span></div>
+                </div>
+                <div class="filter-display">
+                    <span id="monthDisplay">MONTH</span>
+                    <span id="weekDisplay">WEEK</span>
+                </div>
+                <div id="dateRangeDisplay" class="date-range-display"></div>
+                <div class="status-display">STATUS: <span id="statusValue">N/A</span></div>
+                <div class="ba-ranking-section">
+                    <h4>TOP BA RANKING (VALID FD)</h4>
+                    <div id="baRankingList" class="ba-ranking-list"></div>
+                </div>
+              </div>
+              <div class="right-panel">
+                <div id="resultsTableContainer" class="results-table-container"></div>
+                <div class="last-update-display">LAST UPDATE: <span id="lastUpdateValue">N/A</span></div>
+              </div>
+            </div>
+        </div>
+
+        <!-- SALARY SCHEME TAB CONTENT -->
+        <div id="salarySchemeArea" class="tab-content">
+            <h1 class="ba-payout-header">BA PAYOUT SCHEME</h1>
+            <div class="salary-scheme-table-container">
+                <table>
+                    <thead><tr><th>GGR per FD</th><th>Standard FD Rate</th><th>Weekly FD</th><th>Total Payout</th></tr></thead>
+                    <tbody>
+                         <tr><td>BELOW ₱99</td><td>₱ 25.00</td><td>100</td><td>₱ 2,500.00</td></tr>
+                         <tr><td>₱100 - ₱149</td><td>₱ 60.00</td><td>100</td><td>₱ 6,000.00</td></tr>
+                         <tr><td>₱150 - ₱499</td><td>₱ 90.00</td><td>100</td><td>₱ 9,000.00</td></tr>
+                         <tr><td>₱500 - ₱999</td><td>₱ 140.00</td><td>100</td><td>₱ 14,000.00</td></tr>
+                         <tr><td>₱1,000 - ₱1,499</td><td>₱ 230.00</td><td>100</td><td>₱ 23,000.00</td></tr>
+                         <tr><td>₱1,500 - ₱1,999</td><td>₱ 325.00</td><td>100</td><td>₱ 32,500.00</td></tr>
+                         <tr><td>₱2,000 AND ABOVE</td><td>₱ 420.00</td><td>100</td><td>₱ 42,000.00</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="salary-notes">
+                <h3>NOTES:</h3>
+                <ul>
+                     <li><strong>GGR Cutoff:</strong> Monday to Sunday (Weekly)</li>
+                     <li>The current day GGR file will be sent the next day, but the final GGR for the whole payout week will come from the data team after their verification, as this might still increase the GGR of each parent code.</li>
+                     <li>The payout scheme is subject to change at the sole discretion of the company in the event that any abusive acts executed by the brand ambassadors are identified.</li>
+                     <li><strong>0 Reg = 0 FD</strong></li>
+                     <li>FDs with an amount below 100 pesos are disqualified.</li><li> Suspended accounts wil be deducted from weekly payout to ensure that no FAKE accounts were paid to BAs</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+  </div>
+  <div id="globalErrorMessage" class="error-message-main" style="padding: 10px; text-align: center; display:none;"></div>
+
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
