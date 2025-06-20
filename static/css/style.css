@@ -264,4 +264,82 @@ body.light-mode .status-unofficial { color: #6b7280 !important; }
   #dashboardDataDisplay .left-panel .ba-ranking-list { max-height: 150px; }
   #dashboardDataDisplay .left-panel .ba-ranking-list::-webkit-scrollbar { width: 6px; }
   .results-table-container::-webkit-scrollbar { width: 6px; height: 6px; }
+}/* ADD THESE NEW RULES TO THE END OF YOUR STYLE.CSS FILE */
+
+/* --- Styles for Table Editing Controls --- */
+.table-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 10px;
+    padding: 0 5px;
+}
+
+.save-button {
+    font-family: var(--bebas-font);
+    font-size: 1rem;
+    letter-spacing: 0.5px;
+    padding: 8px 25px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    background-color: #28a745; /* Green for save */
+    color: var(--header-text-color);
+    transition: background-color 0.2s;
+}
+
+.save-button:hover {
+    background-color: #218838;
+}
+
+.save-button:disabled {
+    background-color: #5a6268;
+    cursor: not-allowed;
+}
+
+#saveStatusMessage {
+    font-family: var(--roboto-font);
+    font-weight: bold;
+    font-size: 0.9em;
+}
+
+#saveStatusMessage.saving { color: #ffc107; } /* Amber */
+#saveStatusMessage.success { color: #28a745; } /* Green */
+#saveStatusMessage.error { color: var(--error-color); }
+
+/* --- Styles for Editable Cells --- */
+.editable-cell {
+    background-color: rgba(255, 255, 0, 0.1); /* Subtle yellow tint */
+    outline: none;
+}
+
+.editable-cell:focus {
+    background-color: var(--body-bg);
+    box-shadow: 0 0 0 2px var(--primary-blue);
+    z-index: 10;
+    position: relative;
+}
+
+/* --- Styles for Dropdown within the Table --- */
+.results-table-container td > select {
+    width: 100%;
+    padding: 5px;
+    border: 1px solid var(--input-border-color);
+    border-radius: 3px;
+    background-color: var(--input-bg);
+    color: var(--input-text);
+    font-family: var(--bebas-font);
+    font-size: 1em;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23888888%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E');
+    background-repeat: no-repeat;
+    background-position: right 8px top 50%;
+    background-size: .5em auto;
+    padding-right: 25px;
+}
+
+body.light-mode .results-table-container td > select {
+    background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%236c757d%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E');
 }
