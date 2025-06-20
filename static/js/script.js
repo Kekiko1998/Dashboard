@@ -251,7 +251,38 @@ document.addEventListener('DOMContentLoaded', function() {
     function populateDashboardWithData(data) {
         // --- Part 1: Populate Left Panel ---
         const baNameDisplay = document.getElementById('baNameDisplay'), totalRegistrationValue = document.getElementById('totalRegistrationValue'), totalValidFdValue = document.getElementById('totalValidFdValue'), totalSuspendedValue = document.getElementById('totalSuspendedValue'), totalSalaryValue = document.getElementById('totalSalaryValue'), totalIncentiveValue = document.getElementById('totalIncentiveValue'), monthDisplay = document.getElementById('monthDisplay'), weekDisplay = document.getElementById('weekDisplay'), dateRangeDisplay = document.getElementById('dateRangeDisplay'), statusValue = document.getElementById('statusValue'), lastUpdateValue = document.getElementById('lastUpdateValue'), baRankingListDiv = document.getElementById('baRankingList'), resultsTableContainer = document.getElementById('resultsTableContainer');
-        if(baNameDisplay) { /* ... (your existing baNameDisplay logic) ... */ }
+        
+        if(baNameDisplay) {
+            baNameDisplay.innerHTML = '';
+            baNameDisplay.className = 'ba-name-display';
+            const selectedNames = data.searchCriteria?.baNames || [];
+            if (selectedNames.length > 1 && isSpecialUser) { 
+                baNameDisplay.classList.add('multi-select-display');
+                const namesContainer = document.createElement('div');
+                namesContainer.className = 'ba-name-scroll-content';
+                const appendNames = () => {
+                    selectedNames.forEach((name, index) => {
+                        const nameSpan = document.createElement('span');
+                        nameSpan.className = 'ba-name-scroll-item';
+                        nameSpan.textContent = name;
+                        namesContainer.appendChild(nameSpan);
+                        if (index < selectedNames.length - 1 || selectedNames.length > 1) {
+                             const separatorSpan = document.createElement('span');
+                             separatorSpan.className = 'ba-name-scroll-separator';
+                             separatorSpan.textContent = '•';
+                             namesContainer.appendChild(separatorSpan);
+                        }
+                    });
+                };
+                appendNames(); appendNames();
+                const animationDuration = selectedNames.length * 3;
+                namesContainer.style.animation = `marquee-scroll ${animationDuration}s linear infinite`;
+                baNameDisplay.appendChild(namesContainer);
+            } else {
+                baNameDisplay.textContent = data.baNameDisplay || "ALL BA's";
+            }
+        }
+
         const summary = data.summary || {};
         if(totalRegistrationValue) animateValue(totalRegistrationValue, 0, summary.totalRegistration || 0, 700);
         if(totalValidFdValue) animateValue(totalValidFdValue, 0, summary.totalValidFd || 0, 700);
@@ -266,7 +297,32 @@ document.addEventListener('DOMContentLoaded', function() {
             statusValue.textContent = summaryStatus.text; statusValue.className = summaryStatus.class;
         }
         if(lastUpdateValue) { lastUpdateValue.textContent = data.lastUpdate || "N/A"; }
-        if (baRankingListDiv) { /* ... (your existing ranking logic) ... */ }
+        
+        // ======================= BA RANKING LOGIC (RESTORED) =======================
+        if (baRankingListDiv) {
+            baRankingListDiv.innerHTML = ''; 
+            if (data.rankedBaList && data.rankedBaList.length > 0) {
+                data.rankedBaList.forEach((ba, index) => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.classList.add('ba-rank-item');
+                    const rankSpan = document.createElement('span');
+                    rankSpan.classList.add('rank-number');
+                    rankSpan.textContent = `${index + 1}.`;
+                    const nameSpan = document.createElement('span');
+                    nameSpan.classList.add('ba-name');
+                    nameSpan.textContent = ba.originalName || "N/A"; 
+                    nameSpan.title = ba.originalName || "N/A";
+                    const fdSpan = document.createElement('span');
+                    fdSpan.classList.add('ba-fd-count');
+                    fdSpan.textContent = (ba.totalFd || 0).toLocaleString();
+                    itemDiv.appendChild(rankSpan); itemDiv.appendChild(nameSpan); itemDiv.appendChild(fdSpan);
+                    baRankingListDiv.appendChild(itemDiv);
+                });
+            } else {
+                baRankingListDiv.innerHTML = '<p style="text-align:center; font-size:0.8em; color:var(--text-color-subtle);">No BA ranking data available.</p>';
+            }
+        }
+        // ===========================================================================
         
         // --- Part 2: Populate Right Panel (Table) with EDITING features ---
         resultsTableContainer.innerHTML = '';
@@ -280,10 +336,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const table = document.createElement('table'), thead = document.createElement('thead'), tbody = document.createElement('tbody'), headerRow = document.createElement('tr');
             const headers = ['PALCODE','MONTH','WEEK','BA Name','REG','Valid FD','Suspended FD','Rate','GGR Per FD','Total GGR','SALARY','Status'];
             
-            // ======================= MODIFIED LINE =======================
-            // Define which columns are editable. Rate, GGR Per FD, and Salary are now excluded.
             const editableColumns = ['MONTH', 'WEEK', 'BA Name', 'REG', 'Valid FD', 'Suspended FD', 'Total GGR'];
-            // =============================================================
 
             // Create Headers
             const thNo = document.createElement('th'); thNo.textContent = 'No.'; headerRow.appendChild(thNo);
@@ -346,8 +399,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const tableRows = document.querySelectorAll('#resultsTableContainer tbody tr');
 
             tableRows.forEach(row => {
-                // This logic is safe because the backend is the final gatekeeper.
-                // It will gather all data from the row, but the backend will only use the editable fields.
                 const rowData = {
                     palcode: row.dataset.palcode,
                     month: row.querySelector('[data-field="month"]').textContent,
