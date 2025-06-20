@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const baNameSuggestions = document.getElementById('baNameSuggestions');
 
     let isSpecialUser = false;
-    let canEditUser = false; // <-- NEW: Add a variable for the edit permission
+    let canEditUser = false;
     let selectedBaNamesState = [];
 
     // --- Special User UI Transformation Functions ---
@@ -42,7 +42,6 @@ document.addEventListener('DOMContentLoaded', function() {
         baNameInput.addEventListener('keydown', handleMultiSelectKeyDown);
         wrapper.addEventListener('click', handleWrapperClick);
     }
-
     function switchToSimpleView() {
         const wrapper = document.getElementById('baNameMultiSelectWrapper');
         if (!wrapper) return;
@@ -59,16 +58,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         input.removeEventListener('keydown', handleMultiSelectKeyDown);
     }
-
-    function handleMultiSelectKeyDown(e) {
-        if (e.key === 'Enter' && baNameInput.value.trim() !== '') {
-            e.preventDefault();
-            addTag(baNameInput.value.trim(), true);
-            baNameInput.value = '';
-        }
-    }
+    function handleMultiSelectKeyDown(e) { if (e.key === 'Enter' && baNameInput.value.trim() !== '') { e.preventDefault(); addTag(baNameInput.value.trim(), true); baNameInput.value = ''; } }
     function handleWrapperClick(e) { if (e.target.id === 'baNameMultiSelectWrapper') { baNameInput.focus(); } }
-    
     function updateVisibleTags() {
         const wrapper = document.getElementById('baNameMultiSelectWrapper');
         if (!wrapper) return;
@@ -91,7 +82,6 @@ document.addEventListener('DOMContentLoaded', function() {
             baNameInput.classList.remove('placeholder-hidden');
         }
     }
-
     function addTag(name, updateStateArray) {
         if (updateStateArray) {
             const lowerCaseName = name.toLowerCase();
@@ -125,8 +115,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Initial Data Fetching ---
     function setupUIForUser(userInfo) {
         isSpecialUser = userInfo.isSpecial;
-        canEditUser = userInfo.canEdit; // Set the new permission
-        
+        canEditUser = userInfo.canEdit;
         userNameSpan.textContent = userInfo.name;
         userInfoDiv.style.display = 'flex';
         const activeTabButton = document.querySelector('.tab-button.active');
@@ -134,18 +123,22 @@ document.addEventListener('DOMContentLoaded', function() {
             switchToMultiSelectView();
         }
     }
-
-    fetch('/api/user-info').then(res => {
-        if (res.ok) return res.json();
-        window.location.href = '/login'; 
+    fetch('/api/user-info').then(response => {
+        if (response.status === 401) {
+            window.location.href = '/login';
+            return Promise.reject('User not logged in');
+        }
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
     }).then(userInfo => {
         if (userInfo) {
             setupUIForUser(userInfo);
             populateBaNameSuggestions();
         }
-    }).catch(err => {
-        console.error("Could not fetch user info:", err);
-        window.location.href = '/login';
+    }).catch(error => {
+        console.error("Initialization failed:", error);
     });
     
     function populateBaNameSuggestions() {
@@ -238,6 +231,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify(searchPayload),
             })
             .then(res => {
+                if (res.status === 401) { window.location.href = '/login'; return Promise.reject('Session expired'); }
                 if (!res.ok) { return res.json().then(errData => { throw new Error(errData.error || `Server error: ${res.status}`); }); }
                 return res.json();
             })
@@ -246,6 +240,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // --- Data Handling and Display Functions ---
     function handleSearchSuccess(data) {
         searchButton.disabled = false;
         searchButton.textContent = 'SEARCH';
@@ -268,6 +263,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     function handleSearchFailure(error) {
+        if (error.message.includes('Session expired')) {
+            console.log("Session expired, redirecting...");
+            return; 
+        }
         searchButton.disabled = false;
         searchButton.textContent = 'SEARCH';
         loadingIndicator.style.display = 'none';
@@ -277,7 +276,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.error("Server Call Error:", error);
     }
     function determineSummaryStatus(tableData) {
-        const statusColumnIndex = 11; // Status is the 12th column in the data, so index 11
+        const statusColumnIndex = 11;
         if (!tableData || tableData.length === 0) return { text: 'N/A', class: '' };
         const statuses = new Set(tableData.map(row => row.data[statusColumnIndex]?.toString().trim().toLowerCase()).filter(Boolean));
         if (statuses.size === 0) return { text: 'N/A', class: '' };
@@ -295,7 +294,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         return { text: 'MIXED', class: '' };
     }
-
     function populateDashboardWithData(data) {
         const baNameDisplay = document.getElementById('baNameDisplay'), totalRegistrationValue = document.getElementById('totalRegistrationValue'), totalValidFdValue = document.getElementById('totalValidFdValue'), totalSuspendedValue = document.getElementById('totalSuspendedValue'), totalSalaryValue = document.getElementById('totalSalaryValue'), totalIncentiveValue = document.getElementById('totalIncentiveValue'), monthDisplay = document.getElementById('monthDisplay'), weekDisplay = document.getElementById('weekDisplay'), dateRangeDisplay = document.getElementById('dateRangeDisplay'), statusValue = document.getElementById('statusValue'), lastUpdateValue = document.getElementById('lastUpdateValue'), baRankingListDiv = document.getElementById('baRankingList'), resultsTableContainer = document.getElementById('resultsTableContainer');
         if(baNameDisplay) {
@@ -384,7 +382,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     rowData.forEach((cellData, cellIndex) => {
                         const td = document.createElement('td');
                         td.textContent = (cellData === null || cellData === undefined) ? '' : cellData;
-                        if (canEditUser) { // Use the new canEditUser permission
+                        if (canEditUser) {
                             td.setAttribute('contenteditable', 'true');
                             td.classList.add('editable-cell');
                             td.addEventListener('blur', (event) => {
@@ -396,7 +394,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                     headers: {'Content-Type': 'application/json'},
                                     body: JSON.stringify({ rowIndex: sheetRow, colIndex: sheetCol, newValue: newValue })
                                 })
-                                .then(res => res.json())
+                                .then(res => {
+                                    if(res.status === 401) { window.location.href = '/login'; return Promise.reject('Session expired'); }
+                                    return res.json()
+                                })
                                 .then(updateResult => {
                                     cell.classList.remove('saving');
                                     if (updateResult.success) {
@@ -408,6 +409,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         setTimeout(() => cell.classList.remove('error'), 1500);
                                     }
                                 }).catch(err => {
+                                    if(err.message.includes('Session expired')) return;
                                     cell.classList.remove('saving');
                                     cell.classList.add('error');
                                     alert(`Network error: ${err}`);
@@ -415,7 +417,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 });
                             });
                         }
-                        if (cellIndex === 11) { // Status column is now at index 11
+                        if (cellIndex === 11) {
                             let statusClass = '';
                             const statusText = cellData.toString().trim().toLowerCase().replace(/\s+/g, '-');
                             if (['paid', 'on-going', 'delayed', 'updating', 'invalid', 'unofficial'].includes(statusText)) { statusClass = `status-${statusText}`; }

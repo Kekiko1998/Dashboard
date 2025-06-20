@@ -11,45 +11,42 @@ import logging
 import requests
 import pytz
 
-# --- Configuration ---
+# --- Basic Logging Setup & Configuration ---
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 DATABASE_SHEET_ID = '1ZufXPOUcoW2czQ0vcpZwvJNHngV4GHbbSl9q46UwF8g'
 LOGS_SHEET_ID = '1ZufXPOUcoW2czQ0vcpZwvJNHngV4GHbbSl9q46UwF8g'
 SCOPES_SERVICE_ACCOUNT = ['https://www.googleapis.com/auth/spreadsheets']
 SPECIAL_USER_EMAILS = ['harrypobreza@gmail.com', 'official.tutansradio@gmail.com']
-
-# ===============================================================
-# --- NEW: Define a specific list for users who can edit data ---
-# ===============================================================
 EDITOR_EMAILS = ['harrypobreza@gmail.com']
-# ===============================================================
-
 YOUR_TIMEZONE = 'Asia/Manila'
 timestamp_cache = {}
+
+# --- Flask App Initialization ---
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
 # --- User Login Management Setup ---
 login_manager = LoginManager()
 login_manager.init_app(app)
+
+# Custom "unauthorized" handler to solve the JSON error
 @login_manager.unauthorized_handler
 def unauthorized():
-    if request.path.startswith('/api/'): return jsonify(error="User not authenticated"), 401
+    # If the request is for an API endpoint, return a JSON error with a 401 status.
+    if request.path.startswith('/api/'):
+        return jsonify(error="User not authenticated"), 401
+    # Otherwise, for regular page loads, redirect to the HTML login page.
     return redirect(url_for('login'))
 
 class User(UserMixin):
     def __init__(self, id, name, email, is_special=False, can_edit=False):
-        self.id = id
-        self.name = name
-        self.email = email
-        self.is_special = is_special
-        self.can_edit = can_edit # Add the new permission to the user object
-
+        self.id, self.name, self.email, self.is_special, self.can_edit = id, name, email, is_special, can_edit
 users = {}
 @login_manager.user_loader
-def load_user(user_id): return users.get(user_id)
+def load_user(user_id):
+    return users.get(user_id)
 
-# --- All other setup and helper functions are unchanged ---
-# ...
+# --- Google OAuth & Service Account Setup ---
 CLIENT_SECRET_FILE = 'client_secret.json'
 SCOPES_OAUTH = ['https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email', 'openid']
 creds_service_account = None
@@ -66,6 +63,8 @@ try:
 except Exception as e:
     logging.error(f"FATAL ERROR: Could not load Google Sheets credentials. {e}")
     sheet_api = None
+
+# --- Helper Functions ---
 def to_float(value):
     if isinstance(value, (int, float)): return float(value)
     if not isinstance(value, str): return 0.0
@@ -73,6 +72,7 @@ def to_float(value):
     if not cleaned_value: return 0.0
     try: return float(cleaned_value)
     except (ValueError, TypeError): return 0.0
+
 def get_all_sheet_data(sheet_id, sheet_name):
     if not sheet_api: return None
     try:
@@ -83,6 +83,7 @@ def get_all_sheet_data(sheet_id, sheet_name):
     except Exception as e:
         logging.error(f"Error fetching sheet data: {e}")
         return None
+
 def calculate_date_range(month_name, week_str):
     try:
         month_map = { "January": 1, "February": 2, "March": 3, "April": 4, "May": 5, "June": 6, "July": 7, "August": 8, "September": 9, "October": 10, "November": 11, "December": 12 }
@@ -101,9 +102,12 @@ def calculate_date_range(month_name, week_str):
     except Exception as e:
         logging.error(f"Error in calculate_date_range: {e}")
         return ""
+
+# --- Main Application Routes ---
 @app.route('/')
 @login_required
 def index(): return render_template('index.html')
+
 @app.route('/login')
 def login(): return """
         <!DOCTYPE html><html><head><title>Login</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background-color: #121212; color: #e0e0e0; margin: 0; } h1 { font-weight: 500; margin-bottom: 2rem; } a { display: inline-flex; align-items: center; gap: 12px; background-color: #FFFFFF; color: #1f2937; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); transition: transform 0.2s; } a:hover { transform: translateY(-2px); } img { width: 24px; height: 24px; }</style></head><body><h1>Dashboard Login</h1><a href="/authorize"><img src="https://developers.google.com/identity/images/g-logo.png" alt="Google logo">Sign In with Google</a></body></html>
@@ -115,7 +119,6 @@ def authorize():
     authorization_url, state = flow.authorization_url()
     session["state"] = state
     return redirect(authorization_url)
-
 @app.route("/callback")
 def callback():
     flow = Flow.from_client_secrets_file(CLIENT_SECRET_FILE, scopes=SCOPES_OAUTH, state=session["state"], redirect_uri=url_for('callback', _external=True))
@@ -124,17 +127,12 @@ def callback():
     user_info_response = requests.get('https://www.googleapis.com/oauth2/v3/userinfo', headers={'Authorization': f'Bearer {credentials.token}'})
     user_info = user_info_response.json()
     user_id, user_email, user_name = user_info.get('sub'), user_info.get('email', '').lower(), user_info.get('name')
-    
-    # Check permissions
     is_special = user_email in [email.lower() for email in SPECIAL_USER_EMAILS]
-    can_edit = user_email in [email.lower() for email in EDITOR_EMAILS] # Check against the new list
-
-    # Create user with both permissions
+    can_edit = user_email in [email.lower() for email in EDITOR_EMAILS]
     user = User(id=user_id, name=user_name, email=user_email, is_special=is_special, can_edit=can_edit)
     users[user_id] = user
     login_user(user)
     return redirect(url_for('index'))
-
 @app.route("/logout")
 @login_required
 def logout():
@@ -144,38 +142,25 @@ def logout():
 # --- API Routes ---
 @app.route('/api/user-info', methods=['GET'])
 @login_required
-def get_user_info(): 
-    # Send both permissions to the frontend
-    return jsonify({
-        "email": current_user.email, 
-        "name": current_user.name, 
-        "isSpecial": current_user.is_special,
-        "canEdit": current_user.can_edit 
-    })
+def get_user_info(): return jsonify({"email": current_user.email, "name": current_user.name, "isSpecial": current_user.is_special, "canEdit": current_user.can_edit})
 
 @app.route('/api/ba-names', methods=['GET'])
 @login_required
 def get_unique_ba_names():
-    # (function is unchanged)
     try:
         data = get_all_sheet_data(DATABASE_SHEET_ID, 'DATABASE')
         if not data or len(data) <= 1: return jsonify([])
         ba_names = set(row[3].strip() for row in data[1:] if len(row) > 3 and row[3])
         return jsonify(sorted(list(ba_names)))
     except Exception as e: return jsonify({"error": str(e)}), 500
-
 @app.route('/api/update-cell', methods=['POST'])
 @login_required
 def update_cell():
-    # Security Check: Use the new can_edit permission
-    if not current_user.can_edit:
-        return jsonify(error="Permission denied. You do not have rights to edit."), 403
-    
+    if not current_user.can_edit: return jsonify(error="Permission denied."), 403
     if not sheet_api: return jsonify(error="API service not available"), 500
     data = request.get_json()
     row_index, col_index, new_value = data.get('rowIndex'), data.get('colIndex'), data.get('newValue')
-    if row_index is None or col_index is None or new_value is None:
-        return jsonify(error="Missing data: rowIndex, colIndex, and newValue are required."), 400
+    if row_index is None or col_index is None or new_value is None: return jsonify(error="Missing data."), 400
     col_letter = chr(ord('A') + col_index)
     cell_range = f"DATABASE!{col_letter}{row_index}"
     try:
@@ -190,8 +175,8 @@ def update_cell():
 @app.route('/api/search', methods=['POST'])
 @login_required
 def search_dashboard_data():
-    # (The rest of this function is unchanged)
-    req_data, month, week, ba_names, palcode = request.get_json(), req_data.get('month'), req_data.get('week'), req_data.get('baNames', []), req_data.get('palcode', '')
+    req_data = request.get_json()
+    month, week, ba_names, palcode = req_data.get('month'), req_data.get('week'), req_data.get('baNames', []), req_data.get('palcode', '')
     is_special_user = current_user.is_special
     if not month or not week: return jsonify({"error": "Month and Week are required."}), 400
     if not is_special_user and not ba_names: return jsonify({"error": "BA Name is required."}), 400
