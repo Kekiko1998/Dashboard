@@ -148,13 +148,32 @@ document.addEventListener('DOMContentLoaded', function() {
         }).catch(err => console.error('Error fetching BA names:', err));
     }
     
-    // --- UI Management ---
+    // =================================================================
+    // --- UI MANAGEMENT (DARK MODE & TABS) - THIS BLOCK WAS RESTORED ---
+    // =================================================================
     function setDarkMode(isDark) {
-        if (isDark) { document.body.classList.remove('light-mode'); darkModeToggleButton.textContent = '☀️'; localStorage.setItem('dashboardTheme', 'dark'); }
-        else { document.body.classList.add('light-mode'); darkModeToggleButton.textContent = '🌙'; localStorage.setItem('dashboardTheme', 'light'); }
+        if (isDark) {
+            document.body.classList.remove('light-mode');
+            darkModeToggleButton.textContent = '☀️';
+            localStorage.setItem('dashboardTheme', 'dark');
+        } else {
+            document.body.classList.add('light-mode');
+            darkModeToggleButton.textContent = '🌙';
+            localStorage.setItem('dashboardTheme', 'light');
+        }
     }
-    darkModeToggleButton.addEventListener('click', () => setDarkMode(!document.body.classList.contains('light-mode')));
-    if (localStorage.getItem('dashboardTheme') === 'light') { setDarkMode(false); } else { setDarkMode(true); }
+    // Event listener for the toggle button
+    darkModeToggleButton.addEventListener('click', () => {
+        const isCurrentlyDark = !document.body.classList.contains('light-mode');
+        setDarkMode(!isCurrentlyDark);
+    });
+    // Set the initial theme on page load based on localStorage
+    if (localStorage.getItem('dashboardTheme') === 'light') {
+        setDarkMode(false);
+    } else {
+        setDarkMode(true); // Default to dark mode
+    }
+
     window.showTab = function(tabId, clickedButton) {
         document.querySelectorAll(".tab-content").forEach(tab => tab.classList.remove('active-content'));
         document.querySelectorAll(".tab-button").forEach(btn => btn.classList.remove("active"));
@@ -168,6 +187,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (isSpecialUser) switchToSimpleView();
         }
     };
+    // =================================================================
+
     if (searchButton) { searchButton.addEventListener('click', performSearch); }
 
     // --- Search & Data Handling ---
@@ -298,7 +319,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if(lastUpdateValue) { lastUpdateValue.textContent = data.lastUpdate || "N/A"; }
         
-        // ======================= BA RANKING LOGIC (RESTORED) =======================
         if (baRankingListDiv) {
             baRankingListDiv.innerHTML = ''; 
             if (data.rankedBaList && data.rankedBaList.length > 0) {
@@ -322,7 +342,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 baRankingListDiv.innerHTML = '<p style="text-align:center; font-size:0.8em; color:var(--text-color-subtle);">No BA ranking data available.</p>';
             }
         }
-        // ===========================================================================
         
         // --- Part 2: Populate Right Panel (Table) with EDITING features ---
         resultsTableContainer.innerHTML = '';
