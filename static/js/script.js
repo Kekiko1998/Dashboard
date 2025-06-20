@@ -20,12 +20,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const darkModeToggleButton = document.getElementById('darkModeToggle');
     const baNameSuggestions = document.getElementById('baNameSuggestions');
 
-    // All other element selectors are correct, no changes needed here.
-    
     let isSpecialUser = false;
     let selectedBaNamesState = [];
 
-    // --- Special User UI Functions (No changes needed here) ---
+    // --- Special User UI Transformation Functions ---
     function switchToMultiSelectView() {
         if (document.getElementById('baNameMultiSelectWrapper')) return;
         const currentInput = document.getElementById('baNameInput');
@@ -43,7 +41,6 @@ document.addEventListener('DOMContentLoaded', function() {
         baNameInput.addEventListener('keydown', handleMultiSelectKeyDown);
         wrapper.addEventListener('click', handleWrapperClick);
     }
-
     function switchToSimpleView() {
         const wrapper = document.getElementById('baNameMultiSelectWrapper');
         if (!wrapper) return;
@@ -114,7 +111,7 @@ document.addEventListener('DOMContentLoaded', function() {
         updateVisibleTags();
     }
     
-    // --- Initial Data Fetching ---
+    // --- Initial Data Fetching & UI Setup ---
     function setupUIForUser(userInfo) {
         isSpecialUser = userInfo.isSpecial;
         userNameSpan.textContent = userInfo.name;
@@ -175,10 +172,8 @@ document.addEventListener('DOMContentLoaded', function() {
     window.showTab = function(tabId, clickedButton) {
         document.querySelectorAll(".tab-content").forEach(tab => tab.classList.remove('active-content'));
         document.querySelectorAll(".tab-button").forEach(btn => btn.classList.remove("active"));
-        
         document.getElementById(tabId).classList.add('active-content');
         clickedButton.classList.add("active");
-
         if (tabId === 'homeArea') {
             homeContentCentered.appendChild(homeTitleContainer);
             homeContentCentered.appendChild(homeSearchControlsContainer);
@@ -192,17 +187,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (searchButton) {
         searchButton.addEventListener('click', function() {
-            const month = monthSelect.value;
-            const week = weekSelect.value;
-            const palcode = palcodeInput.value.trim();
+            const month = monthSelect.value, week = weekSelect.value, palcode = palcodeInput.value.trim();
             let baNamesToSearch;
             const baNameInputValue = document.getElementById('baNameInput').value.trim();
             if (isSpecialUser) {
                 if (document.getElementById('baNameMultiSelectWrapper')) {
-                    if (baNameInputValue !== '') {
-                        addTag(baNameInputValue, true);
-                        document.getElementById('baNameInput').value = ''; 
-                    }
+                    if (baNameInputValue !== '') { addTag(baNameInputValue, true); document.getElementById('baNameInput').value = ''; }
                     baNamesToSearch = selectedBaNamesState;
                 } else {
                     baNamesToSearch = baNameInputValue ? [baNameInputValue] : [];
@@ -215,9 +205,7 @@ document.addEventListener('DOMContentLoaded', function() {
             let missingFields = [];
             if (!month) missingFields.push("MONTH");
             if (!week) missingFields.push("WEEK");
-            if (!isSpecialUser && baNamesToSearch.length === 0) {
-                missingFields.push("BA NAME");
-            }
+            if (!isSpecialUser && baNamesToSearch.length === 0) missingFields.push("BA NAME");
             if (missingFields.length > 0) {
                 errorTarget.textContent = `❌ Please select: ${missingFields.join(', ')}.`;
                 return;
@@ -235,13 +223,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(searchPayload),
             })
-            .then(response => {
-                if (!response.ok) {
-                    return response.json().then(errorData => {
-                        throw new Error(errorData.error || `Server error: ${response.status}`);
-                    });
-                }
-                return response.json();
+            .then(res => {
+                if (!res.ok) { return res.json().then(errData => { throw new Error(errData.error || `Server error: ${res.status}`); }); }
+                return res.json();
             })
             .then(data => handleSearchSuccess(data))
             .catch(error => handleSearchFailure(error));
@@ -253,7 +237,6 @@ document.addEventListener('DOMContentLoaded', function() {
         searchButton.disabled = false;
         searchButton.textContent = 'SEARCH';
         loadingIndicator.style.display = 'none';
-        
         if (data.error || (!data.resultsTable && !data.summary)) {
             dashboardSearchError.querySelector('p').textContent = `⚠️ ${data.error || 'An unknown error occurred.'}`;
             dashboardSearchError.style.display = 'flex';
@@ -271,7 +254,6 @@ document.addEventListener('DOMContentLoaded', function() {
             dashboardDataDisplay.style.display = 'none';
         }
     }
-
     function handleSearchFailure(error) {
         searchButton.disabled = false;
         searchButton.textContent = 'SEARCH';
@@ -281,11 +263,10 @@ document.addEventListener('DOMContentLoaded', function() {
         dashboardDataDisplay.style.display = 'none';
         console.error("Server Call Error:", error);
     }
-    
     function determineSummaryStatus(tableData) {
         const statusColumnIndex = 9;
         if (!tableData || tableData.length === 0) return { text: 'N/A', class: '' };
-        const statuses = new Set(tableData.map(row => row[statusColumnIndex]?.toString().trim().toLowerCase()).filter(Boolean));
+        const statuses = new Set(tableData.map(row => row.data[statusColumnIndex]?.toString().trim().toLowerCase()).filter(Boolean));
         if (statuses.size === 0) return { text: 'N/A', class: '' };
         if (statuses.size === 1) {
             const singleStatus = statuses.values().next().value;
@@ -302,24 +283,8 @@ document.addEventListener('DOMContentLoaded', function() {
         return { text: 'MIXED', class: '' };
     }
 
-    // ===============================================================
-    // --- THIS IS THE CORRECTED populateDashboardWithData FUNCTION ---
-    // ===============================================================
     function populateDashboardWithData(data) {
-        const baNameDisplay = document.getElementById('baNameDisplay');
-        const totalRegistrationValue = document.getElementById('totalRegistrationValue');
-        const totalValidFdValue = document.getElementById('totalValidFdValue');
-        const totalSuspendedValue = document.getElementById('totalSuspendedValue');
-        const totalSalaryValue = document.getElementById('totalSalaryValue');
-        const totalIncentiveValue = document.getElementById('totalIncentiveValue');
-        const monthDisplay = document.getElementById('monthDisplay');
-        const weekDisplay = document.getElementById('weekDisplay');
-        const dateRangeDisplay = document.getElementById('dateRangeDisplay');
-        const statusValue = document.getElementById('statusValue');
-        const lastUpdateValue = document.getElementById('lastUpdateValue'); // Correctly get the element
-        const baRankingListDiv = document.getElementById('baRankingList');
-        const resultsTableContainer = document.getElementById('resultsTableContainer');
-
+        const baNameDisplay = document.getElementById('baNameDisplay'), totalRegistrationValue = document.getElementById('totalRegistrationValue'), totalValidFdValue = document.getElementById('totalValidFdValue'), totalSuspendedValue = document.getElementById('totalSuspendedValue'), totalSalaryValue = document.getElementById('totalSalaryValue'), totalIncentiveValue = document.getElementById('totalIncentiveValue'), monthDisplay = document.getElementById('monthDisplay'), weekDisplay = document.getElementById('weekDisplay'), dateRangeDisplay = document.getElementById('dateRangeDisplay'), statusValue = document.getElementById('statusValue'), lastUpdateValue = document.getElementById('lastUpdateValue'), baRankingListDiv = document.getElementById('baRankingList'), resultsTableContainer = document.getElementById('resultsTableContainer');
         if(baNameDisplay) {
             baNameDisplay.innerHTML = '';
             baNameDisplay.className = 'ba-name-display';
@@ -334,7 +299,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         nameSpan.className = 'ba-name-scroll-item';
                         nameSpan.textContent = name;
                         namesContainer.appendChild(nameSpan);
-
                         if (index < selectedNames.length - 1 || selectedNames.length > 1) {
                              const separatorSpan = document.createElement('span');
                              separatorSpan.className = 'ba-name-scroll-separator';
@@ -343,8 +307,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     });
                 };
-                appendNames();
-                appendNames();
+                appendNames(); appendNames();
                 const animationDuration = selectedNames.length * 3;
                 namesContainer.style.animation = `marquee-scroll ${animationDuration}s linear infinite`;
                 baNameDisplay.appendChild(namesContainer);
@@ -352,30 +315,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 baNameDisplay.textContent = data.baNameDisplay || "ALL BA's";
             }
         }
-        
         const summary = data.summary || {};
         if(totalRegistrationValue) animateValue(totalRegistrationValue, 0, summary.totalRegistration || 0, 700);
         if(totalValidFdValue) animateValue(totalValidFdValue, 0, summary.totalValidFd || 0, 700);
         if(totalSuspendedValue) animateValue(totalSuspendedValue, 0, summary.totalSuspended || 0, 700);
         if(totalSalaryValue) animateValue(totalSalaryValue, 0, summary.totalSalary || 0, 700, true);
         if(totalIncentiveValue) animateValue(totalIncentiveValue, 0, summary.totalIncentives || 0, 700, true);
-        
         if(monthDisplay) monthDisplay.textContent = data.monthDisplay || "N/A";
         if(weekDisplay) weekDisplay.textContent = data.weekDisplay || "N/A";
         if(dateRangeDisplay) dateRangeDisplay.textContent = data.dateRangeDisplay || ""; 
-        
         if (statusValue) {
             const summaryStatus = determineSummaryStatus(data.resultsTable);
             statusValue.textContent = summaryStatus.text;
             statusValue.className = summaryStatus.class;
         }
-
-        // --- THIS IS THE FIX ---
-        if(lastUpdateValue) {
-            lastUpdateValue.textContent = data.lastUpdate || "N/A";
-        }
-        // -----------------------
-        
+        if(lastUpdateValue) { lastUpdateValue.textContent = data.lastUpdate || "N/A"; }
         if (baRankingListDiv) {
             baRankingListDiv.innerHTML = ''; 
             if (data.rankedBaList && data.rankedBaList.length > 0) {
@@ -392,48 +346,65 @@ document.addEventListener('DOMContentLoaded', function() {
                     const fdSpan = document.createElement('span');
                     fdSpan.classList.add('ba-fd-count');
                     fdSpan.textContent = (ba.totalFd || 0).toLocaleString();
-                    itemDiv.appendChild(rankSpan);
-                    itemDiv.appendChild(nameSpan);
-                    itemDiv.appendChild(fdSpan);
+                    itemDiv.appendChild(rankSpan); itemDiv.appendChild(nameSpan); itemDiv.appendChild(fdSpan);
                     baRankingListDiv.appendChild(itemDiv);
                 });
             } else {
                 baRankingListDiv.innerHTML = '<p style="text-align:center; font-size:0.8em; color:var(--text-color-subtle);">No BA ranking data available.</p>';
             }
         }
-
         if(resultsTableContainer) {
             resultsTableContainer.innerHTML = '';
             if (data.resultsTable && data.resultsTable.length > 0) {
-                const table = document.createElement('table');
-                const thead = document.createElement('thead');
-                const tbody = document.createElement('tbody');
-                const headerRow = document.createElement('tr');
+                const table = document.createElement('table'), thead = document.createElement('thead'), tbody = document.createElement('tbody'), headerRow = document.createElement('tr');
                 const headers = ['PALCODE','BA Name','REG','Valid FD','Suspended FD','Rate','GGR Per FD','Total GGR','SALARY','Status'];
                 const thNo = document.createElement('th'); thNo.textContent = 'No.'; headerRow.appendChild(thNo);
                 headers.forEach(text => { const th = document.createElement('th'); th.textContent = text.toUpperCase(); headerRow.appendChild(th); });
                 thead.appendChild(headerRow); table.appendChild(thead);
-                const statusColumnDataIndex = 9; 
-                const rippleDelayIncrement = 0.05;
-                data.resultsTable.forEach((rowData, rowIndex) => {
+                data.resultsTable.forEach((rowObject, rowIndex) => {
+                    const rowData = rowObject.data;
+                    const originalRowNum = rowObject.originalRowNum;
                     const tr = document.createElement('tr');
-                    tr.classList.add('result-row-animate'); tr.style.animationDelay = `${rowIndex * rippleDelayIncrement}s`;
+                    tr.dataset.originalRowNum = originalRowNum;
+                    tr.classList.add('result-row-animate'); tr.style.animationDelay = `${rowIndex * 0.05}s`;
                     const tdNo = document.createElement('td'); tdNo.textContent = rowIndex + 1; tr.appendChild(tdNo);
                     rowData.forEach((cellData, cellIndex) => {
                         const td = document.createElement('td');
-                        const formattedCell = (cellData === null || cellData === undefined) ? '' : cellData;
-                        td.textContent = formattedCell;
-                        if (cellIndex === statusColumnDataIndex) {
+                        td.textContent = (cellData === null || cellData === undefined) ? '' : cellData;
+                        if (isSpecialUser) {
+                            td.setAttribute('contenteditable', 'true');
+                            td.classList.add('editable-cell');
+                            td.addEventListener('blur', (event) => {
+                                const cell = event.target, newValue = cell.textContent, parentRow = cell.closest('tr'), sheetRow = parentRow.dataset.originalRowNum, sheetCol = cellIndex; 
+                                cell.classList.add('saving');
+                                fetch('/api/update-cell', {
+                                    method: 'POST',
+                                    headers: {'Content-Type': 'application/json'},
+                                    body: JSON.stringify({ rowIndex: sheetRow, colIndex: sheetCol, newValue: newValue })
+                                })
+                                .then(res => res.json())
+                                .then(updateResult => {
+                                    cell.classList.remove('saving');
+                                    if (updateResult.success) {
+                                        cell.classList.add('saved');
+                                        setTimeout(() => cell.classList.remove('saved'), 1500);
+                                    } else {
+                                        cell.classList.add('error');
+                                        alert(`Error saving: ${updateResult.error}`);
+                                        setTimeout(() => cell.classList.remove('error'), 1500);
+                                    }
+                                }).catch(err => {
+                                    cell.classList.remove('saving');
+                                    cell.classList.add('error');
+                                    alert(`Network error: ${err}`);
+                                    setTimeout(() => cell.classList.remove('error'), 1500);
+                                });
+                            });
+                        }
+                        if (cellIndex === 9) { 
                             let statusClass = '';
-                            const statusText = formattedCell.toString().trim().toLowerCase().replace(/\s+/g, '-');
-                            switch (statusText) {
-                                case 'paid': statusClass = 'status-paid'; break;
-                                case 'on-going': statusClass = 'status-on-going'; break;
-                                case 'delayed': statusClass = 'status-delayed'; break;
-                                case 'updating': statusClass = 'status-updating'; break;
-                                case 'invalid': statusClass = 'status-invalid'; break;
-                                case 'unofficial': statusClass = 'status-unofficial'; break;
-                            }
+                            const statusText = cellData.toString().trim().toLowerCase().replace(/\s+/g, '-');
+                            if (['paid', 'on-going', 'delayed', 'updating', 'invalid', 'unofficial'].includes(statusText)) { statusClass = `status-${statusText}`; }
                             if (statusClass) td.classList.add(statusClass);
                         }
                         tr.appendChild(td);
@@ -446,15 +417,11 @@ document.addEventListener('DOMContentLoaded', function() {
                  resultsTableContainer.innerHTML = `<p class="no-data-message">${data.message || 'Summary data is shown in the left panel. No detailed records for this query.'}</p>`;
             }
         }
-
         if(dashboardDataDisplay) {
             dashboardDataDisplay.style.opacity = '0';
-             setTimeout(() => {
-                dashboardDataDisplay.style.opacity = '1';
-            }, 50);
+             setTimeout(() => { dashboardDataDisplay.style.opacity = '1'; }, 50);
         }
     }
-    // ===============================================================
     
     function animateValue(element, start, end, duration, isCurrency = false) {
         if (!element || typeof end !== 'number' || isNaN(end)) {
@@ -470,14 +437,10 @@ document.addEventListener('DOMContentLoaded', function() {
             let displayValue;
             if (isCurrency) {
                 displayValue = `₱ ${currentValue.toLocaleString()}`;
-                if (progress >= 1) {
-                    displayValue = `₱ ${parseFloat(end).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-                }
+                if (progress >= 1) { displayValue = `₱ ${parseFloat(end).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`; }
             } else {
                 displayValue = currentValue.toLocaleString();
-                 if (progress >= 1) {
-                    displayValue = end.toLocaleString();
-                }
+                if (progress >= 1) { displayValue = end.toLocaleString(); }
             }
             element.textContent = displayValue;
             if (progress < 1) { window.requestAnimationFrame(step); }

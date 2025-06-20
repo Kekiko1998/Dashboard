@@ -11,43 +11,31 @@ import logging
 import requests
 import pytz
 
-# --- Basic Logging Setup ---
+# --- Basic Logging Setup & Configuration ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-# --- Configuration ---
 DATABASE_SHEET_ID = '1ZufXPOUcoW2czQ0vcpZwvJNHngV4GHbbSl9q46UwF8g'
 LOGS_SHEET_ID = '1ZufXPOUcoW2czQ0vcpZwvJNHngV4GHbbSl9q46UwF8g'
 SCOPES_SERVICE_ACCOUNT = ['https://www.googleapis.com/auth/spreadsheets']
 SPECIAL_USER_EMAILS = ['harrypobreza@gmail.com', 'official.tutansradio@gmail.com']
 YOUR_TIMEZONE = 'Asia/Manila'
-
-# ===============================================================
-# --- NEW: In-memory cache for storing timestamps and data hashes ---
-# ===============================================================
-# In a real-world, multi-server app, you'd use a database like Redis for this.
-# For this single-instance app, a simple dictionary is perfect.
-# The key will be a combination of month and week (e.g., "june-week 3")
-# The value will be another dictionary: {'hash': '...', 'timestamp': '...'}
 timestamp_cache = {}
-# ===============================================================
-
-
-# --- Flask App Initialization ---
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
-# (The rest of the file is the same until the /api/search route)
-# ...
+# --- User Login & Google API Setup ---
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = "login"
+@login_manager.unauthorized_handler
+def unauthorized():
+    if request.path.startswith('/api/'): return jsonify(error="User not authenticated"), 401
+    return redirect(url_for('login'))
+
 class User(UserMixin):
-    def __init__(self, id, name, email, is_special=False):
-        self.id, self.name, self.email, self.is_special = id, name, email, is_special
+    def __init__(self, id, name, email, is_special=False): self.id, self.name, self.email, self.is_special = id, name, email, is_special
 users = {}
 @login_manager.user_loader
-def load_user(user_id):
-    return users.get(user_id)
+def load_user(user_id): return users.get(user_id)
+
 CLIENT_SECRET_FILE = 'client_secret.json'
 SCOPES_OAUTH = ['https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email', 'openid']
 creds_service_account = None
@@ -64,6 +52,8 @@ try:
 except Exception as e:
     logging.error(f"FATAL ERROR: Could not load Google Sheets credentials. {e}")
     sheet_api = None
+
+# --- Helper Functions ---
 def to_float(value):
     if isinstance(value, (int, float)): return float(value)
     if not isinstance(value, str): return 0.0
@@ -71,14 +61,22 @@ def to_float(value):
     if not cleaned_value: return 0.0
     try: return float(cleaned_value)
     except (ValueError, TypeError): return 0.0
+
 def get_all_sheet_data(sheet_id, sheet_name):
     if not sheet_api: return None
     try:
-        result = sheet_api.values().get(spreadsheetId=sheet_id, range=f"{sheet_name}!A:L").execute()
-        return result.get('values', [])
+        result = sheet_api.values().get(spreadsheetId=sheet_id, range=f"{sheet_name}!A:L", majorDimension='ROWS').execute()
+        values = result.get('values', [])
+        # Add the original row number to each row of data
+        for i, row in enumerate(values):
+            # The header is row 1, so data starts at row 2.
+            # We add the original sheet row number (1-indexed).
+            row.append(i + 1)
+        return values
     except Exception as e:
         logging.error(f"Error fetching sheet data: {e}")
         return None
+
 def calculate_date_range(month_name, week_str):
     try:
         month_map = { "January": 1, "February": 2, "March": 3, "April": 4, "May": 5, "June": 6, "July": 7, "August": 8, "September": 9, "October": 10, "November": 11, "December": 12 }
@@ -99,13 +97,14 @@ def calculate_date_range(month_name, week_str):
     except Exception as e:
         logging.error(f"Error in calculate_date_range: {e}")
         return ""
+
+# --- Main Application Routes ---
 @app.route('/')
 @login_required
-def index():
-    return render_template('index.html')
+def index(): return render_template('index.html')
+
 @app.route('/login')
-def login():
-    return """
+def login(): return """
         <!DOCTYPE html><html><head><title>Login</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background-color: #121212; color: #e0e0e0; margin: 0; } h1 { font-weight: 500; margin-bottom: 2rem; } a { display: inline-flex; align-items: center; gap: 12px; background-color: #FFFFFF; color: #1f2937; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); transition: transform 0.2s; } a:hover { transform: translateY(-2px); } img { width: 24px; height: 24px; }</style></head><body><h1>Dashboard Login</h1><a href="/authorize"><img src="https://developers.google.com/identity/images/g-logo.png" alt="Google logo">Sign In with Google</a></body></html>
     """
 @app.route("/authorize")
@@ -133,10 +132,12 @@ def callback():
 def logout():
     logout_user()
     return redirect(url_for('login'))
+
+# --- API Routes ---
 @app.route('/api/user-info', methods=['GET'])
 @login_required
-def get_user_info():
-    return jsonify({"email": current_user.email, "name": current_user.name, "isSpecial": current_user.is_special})
+def get_user_info(): return jsonify({"email": current_user.email, "name": current_user.name, "isSpecial": current_user.is_special})
+
 @app.route('/api/ba-names', methods=['GET'])
 @login_required
 def get_unique_ba_names():
@@ -147,63 +148,57 @@ def get_unique_ba_names():
         return jsonify(sorted(list(ba_names)))
     except Exception as e: return jsonify({"error": str(e)}), 500
 
+@app.route('/api/update-cell', methods=['POST'])
+@login_required
+def update_cell():
+    if not current_user.is_special: return jsonify(error="Permission denied"), 403
+    if not sheet_api: return jsonify(error="API service not available"), 500
+    data = request.get_json()
+    row_index, col_index, new_value = data.get('rowIndex'), data.get('colIndex'), data.get('newValue')
+    if row_index is None or col_index is None or new_value is None:
+        return jsonify(error="Missing data: rowIndex, colIndex, and newValue are required."), 400
+    col_letter = chr(ord('A') + col_index)
+    cell_range = f"DATABASE!{col_letter}{row_index}"
+    try:
+        body = {'values': [[new_value]]}
+        result = sheet_api.values().update(spreadsheetId=DATABASE_SHEET_ID, range=cell_range, valueInputOption='USER_ENTERED', body=body).execute()
+        log_user_event('updateCell', {'range': cell_range, 'value': new_value})
+        return jsonify(success=True, updatedRange=result.get('updatedRange'))
+    except Exception as e:
+        logging.error(f"Error updating cell {cell_range}: {e}")
+        return jsonify(error=f"Failed to update cell: {e}"), 500
+
 @app.route('/api/search', methods=['POST'])
 @login_required
 def search_dashboard_data():
     req_data = request.get_json()
     month, week, ba_names, palcode = req_data.get('month'), req_data.get('week'), req_data.get('baNames', []), req_data.get('palcode', '')
     is_special_user = current_user.is_special
-    
     if not month or not week: return jsonify({"error": "Month and Week are required."}), 400
     if not is_special_user and not ba_names: return jsonify({"error": "BA Name is required."}), 400
-    
     all_sheet_data = get_all_sheet_data(DATABASE_SHEET_ID, 'DATABASE')
     if all_sheet_data is None: return jsonify({"error": "Database sheet not found or API failed."}), 500
-        
     log_user_event('searchDashboardData', req_data)
     search_month, search_week = month.strip().lower(), week.strip().lower()
     search_ba_names_lower = [str(name).strip().lower() for name in ba_names if name]
     search_palcode_lower = palcode.strip().lower() if palcode else ""
-    PALCODE, MONTH, WEEK, BA_NAME, REG, VALID_FD, SUSPENDED_FD, RATE, GGR_PER_FD, TOTAL_GGR, SALARY, STATUS = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
+    PALCODE, MONTH, WEEK, BA_NAME, REG, VALID_FD, SUSPENDED_FD, RATE, GGR_PER_FD, TOTAL_GGR, SALARY, STATUS, ORIGINAL_ROW_NUM = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
     period_data_rows = [row for row in all_sheet_data[1:] if len(row) > WEEK and row[MONTH].strip().lower() == search_month and row[WEEK].strip().lower() == search_week]
-    
-    # ===============================================================
-    # --- THIS IS THE NEW TIMESTAMP AND HASHING LOGIC ---
-    # ===============================================================
     cache_key = f"{search_month}-{search_week}"
-    
-    # Create a hash (fingerprint) of the relevant data
-    # We convert the list of lists to a string to hash it
     current_data_str = json.dumps(period_data_rows, sort_keys=True)
     current_hash = hashlib.md5(current_data_str.encode('utf-8')).hexdigest()
-
-    # Get the previous hash and timestamp from our cache
     last_known_data = timestamp_cache.get(cache_key)
-    
-    last_update_timestamp = ""
-
     if last_known_data and last_known_data['hash'] == current_hash:
-        # Data has NOT changed, so we use the OLD timestamp
         last_update_timestamp = last_known_data['timestamp']
-        logging.info(f"Data for {cache_key} has not changed. Using cached timestamp.")
     else:
-        # Data IS new or has changed. Generate a NEW timestamp and update the cache.
-        utc_now = datetime.now(pytz.utc)
-        local_tz = pytz.timezone(YOUR_TIMEZONE)
+        utc_now, local_tz = datetime.now(pytz.utc), pytz.timezone(YOUR_TIMEZONE)
         local_now = utc_now.astimezone(local_tz)
         last_update_timestamp = local_now.strftime('%A, %B %d, %Y, %I:%M:%S %p')
-        
-        # Store the new hash and timestamp in our cache
         timestamp_cache[cache_key] = {'hash': current_hash, 'timestamp': last_update_timestamp}
-        logging.info(f"Data for {cache_key} has changed. Caching new timestamp.")
-    # ===============================================================
-
     ba_display_name = "ALL BAs" if is_special_user and not search_ba_names_lower else (f"MULTIPLE BAs ({len(search_ba_names_lower)})" if len(search_ba_names_lower) > 1 else (ba_names[0].strip().upper() if search_ba_names_lower else "N/A"))
     search_criteria_frontend, date_range_display = {'baNames': [name.strip().upper() for name in ba_names]}, calculate_date_range(month, week)
-
     if not period_data_rows:
         return jsonify({ "baNameDisplay": ba_display_name, "searchCriteria": search_criteria_frontend, "summary": {"totalRegistration": 0, "totalValidFd": 0, "totalSuspended": 0, "totalSalary": 0, "totalIncentives": 0}, "monthDisplay": search_month.upper(), "weekDisplay": search_week.upper(), "dateRangeDisplay": date_range_display, "status": "N/A", "resultsTable": [], "rankedBaList": [], "lastUpdate": last_update_timestamp, "message": "No records for selected period." })
-
     overall_total_valid_fd, ba_period_fds = 0, {}
     for row in period_data_rows:
         try:
@@ -212,7 +207,6 @@ def search_dashboard_data():
             if ba_name not in ba_period_fds: ba_period_fds[ba_name] = {"originalName": ba_name, "totalFd": 0}
             ba_period_fds[ba_name]["totalFd"] += current_fd
         except (ValueError, IndexError): continue
-    
     final_ranked_ba_list = sorted(ba_period_fds.values(), key=lambda x: x['totalFd'], reverse=True)
     ba_incentives_map, sum_of_all_individual_incentives = {}, 0
     if overall_total_valid_fd >= 6000:
@@ -223,26 +217,22 @@ def search_dashboard_data():
             elif rank == 3: incentive = 900
             elif 4 <= rank <= 6: incentive = 500
             elif rank > 6 and ba['totalFd'] > 0: incentive = 200
-            if incentive > 0:
-                ba_incentives_map[ba['originalName'].upper()] = incentive
-                sum_of_all_individual_incentives += incentive
-    
+            if incentive > 0: ba_incentives_map[ba['originalName'].upper()] = incentive; sum_of_all_individual_incentives += incentive
     filtered_rows = [row for row in period_data_rows if ((not search_ba_names_lower or (len(row) > BA_NAME and row[BA_NAME].strip().lower() in search_ba_names_lower)) and (not search_palcode_lower or (len(row) > PALCODE and row[PALCODE].strip().lower() == search_palcode_lower)))]
     results_for_table, summary_for_display = [], {"totalRegistration": 0, "totalValidFd": 0, "totalSuspended": 0, "totalSalary": 0, "totalIncentives": 0}
-    
     for row in filtered_rows:
         try:
-            results_for_table.append([row[i] if len(row) > i else "" for i in [PALCODE, BA_NAME, REG, VALID_FD, SUSPENDED_FD, RATE, GGR_PER_FD, TOTAL_GGR, SALARY, STATUS]])
+            row_data = [row[i] if len(row) > i else "" for i in [PALCODE, BA_NAME, REG, VALID_FD, SUSPENDED_FD, RATE, GGR_PER_FD, TOTAL_GGR, SALARY, STATUS]]
+            original_row_num = row[ORIGINAL_ROW_NUM] if len(row) > ORIGINAL_ROW_NUM else -1
+            results_for_table.append({'data': row_data, 'originalRowNum': original_row_num})
             summary_for_display['totalRegistration'] += to_float(row[REG]) if len(row) > REG else 0
             summary_for_display['totalValidFd'] += to_float(row[VALID_FD]) if len(row) > VALID_FD else 0
             summary_for_display['totalSuspended'] += to_float(row[SUSPENDED_FD]) if len(row) > SUSPENDED_FD else 0
             summary_for_display['totalSalary'] += to_float(row[SALARY]) if len(row) > SALARY else 0
         except IndexError as e: logging.warning(f"Skipping row due to missing columns: {row} -> {e}")
-    
     if overall_total_valid_fd >= 6000:
         if search_ba_names_lower: summary_for_display['totalIncentives'] = sum(ba_incentives_map.get(name.upper(), 0) for name in ba_names)
         elif is_special_user: summary_for_display['totalIncentives'] = sum_of_all_individual_incentives
-    
     return jsonify({ "baNameDisplay": ba_display_name, "searchCriteria": search_criteria_frontend, "summary": summary_for_display, "monthDisplay": search_month.upper(), "weekDisplay": search_week.upper(), "dateRangeDisplay": date_range_display, "status": "Active", "resultsTable": results_for_table, "rankedBaList": final_ranked_ba_list, "lastUpdate": last_update_timestamp })
 
 def log_user_event(function_name, inputs):
