@@ -11,18 +11,24 @@ import logging
 import requests
 import pytz
 
-# --- Basic Logging Setup & Configuration ---
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# --- Configuration ---
 DATABASE_SHEET_ID = '1ZufXPOUcoW2czQ0vcpZwvJNHngV4GHbbSl9q46UwF8g'
 LOGS_SHEET_ID = '1ZufXPOUcoW2czQ0vcpZwvJNHngV4GHbbSl9q46UwF8g'
 SCOPES_SERVICE_ACCOUNT = ['https://www.googleapis.com/auth/spreadsheets']
 SPECIAL_USER_EMAILS = ['harrypobreza@gmail.com', 'official.tutansradio@gmail.com']
+
+# ===============================================================
+# --- NEW: Define a specific list for users who can edit data ---
+# ===============================================================
+EDITOR_EMAILS = ['harrypobreza@gmail.com']
+# ===============================================================
+
 YOUR_TIMEZONE = 'Asia/Manila'
 timestamp_cache = {}
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
-# --- User Login & Google API Setup ---
+# --- User Login Management Setup ---
 login_manager = LoginManager()
 login_manager.init_app(app)
 @login_manager.unauthorized_handler
@@ -31,11 +37,19 @@ def unauthorized():
     return redirect(url_for('login'))
 
 class User(UserMixin):
-    def __init__(self, id, name, email, is_special=False): self.id, self.name, self.email, self.is_special = id, name, email, is_special
+    def __init__(self, id, name, email, is_special=False, can_edit=False):
+        self.id = id
+        self.name = name
+        self.email = email
+        self.is_special = is_special
+        self.can_edit = can_edit # Add the new permission to the user object
+
 users = {}
 @login_manager.user_loader
 def load_user(user_id): return users.get(user_id)
 
+# --- All other setup and helper functions are unchanged ---
+# ...
 CLIENT_SECRET_FILE = 'client_secret.json'
 SCOPES_OAUTH = ['https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email', 'openid']
 creds_service_account = None
@@ -52,8 +66,6 @@ try:
 except Exception as e:
     logging.error(f"FATAL ERROR: Could not load Google Sheets credentials. {e}")
     sheet_api = None
-
-# --- Helper Functions ---
 def to_float(value):
     if isinstance(value, (int, float)): return float(value)
     if not isinstance(value, str): return 0.0
@@ -61,22 +73,16 @@ def to_float(value):
     if not cleaned_value: return 0.0
     try: return float(cleaned_value)
     except (ValueError, TypeError): return 0.0
-
 def get_all_sheet_data(sheet_id, sheet_name):
     if not sheet_api: return None
     try:
         result = sheet_api.values().get(spreadsheetId=sheet_id, range=f"{sheet_name}!A:L", majorDimension='ROWS').execute()
         values = result.get('values', [])
-        # Add the original row number to each row of data
-        for i, row in enumerate(values):
-            # The header is row 1, so data starts at row 2.
-            # We add the original sheet row number (1-indexed).
-            row.append(i + 1)
+        for i, row in enumerate(values): row.append(i + 1)
         return values
     except Exception as e:
         logging.error(f"Error fetching sheet data: {e}")
         return None
-
 def calculate_date_range(month_name, week_str):
     try:
         month_map = { "January": 1, "February": 2, "March": 3, "April": 4, "May": 5, "June": 6, "July": 7, "August": 8, "September": 9, "October": 10, "November": 11, "December": 12 }
@@ -90,19 +96,14 @@ def calculate_date_range(month_name, week_str):
         selected_week_start_date = week1_start_date + timedelta(weeks=week_num - 1)
         selected_week_end_date = selected_week_start_date + timedelta(days=6)
         start_month_name, end_month_name = selected_week_start_date.strftime("%B").upper(), selected_week_end_date.strftime("%B").upper()
-        if start_month_name == end_month_name:
-            return f"{start_month_name} {selected_week_start_date.day} - {selected_week_end_date.day}"
-        else:
-            return f"{start_month_name} {selected_week_start_date.day} - {end_month_name} {selected_week_end_date.day}"
+        if start_month_name == end_month_name: return f"{start_month_name} {selected_week_start_date.day} - {selected_week_end_date.day}"
+        else: return f"{start_month_name} {selected_week_start_date.day} - {end_month_name} {selected_week_end_date.day}"
     except Exception as e:
         logging.error(f"Error in calculate_date_range: {e}")
         return ""
-
-# --- Main Application Routes ---
 @app.route('/')
 @login_required
 def index(): return render_template('index.html')
-
 @app.route('/login')
 def login(): return """
         <!DOCTYPE html><html><head><title>Login</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background-color: #121212; color: #e0e0e0; margin: 0; } h1 { font-weight: 500; margin-bottom: 2rem; } a { display: inline-flex; align-items: center; gap: 12px; background-color: #FFFFFF; color: #1f2937; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); transition: transform 0.2s; } a:hover { transform: translateY(-2px); } img { width: 24px; height: 24px; }</style></head><body><h1>Dashboard Login</h1><a href="/authorize"><img src="https://developers.google.com/identity/images/g-logo.png" alt="Google logo">Sign In with Google</a></body></html>
@@ -114,6 +115,7 @@ def authorize():
     authorization_url, state = flow.authorization_url()
     session["state"] = state
     return redirect(authorization_url)
+
 @app.route("/callback")
 def callback():
     flow = Flow.from_client_secrets_file(CLIENT_SECRET_FILE, scopes=SCOPES_OAUTH, state=session["state"], redirect_uri=url_for('callback', _external=True))
@@ -122,11 +124,17 @@ def callback():
     user_info_response = requests.get('https://www.googleapis.com/oauth2/v3/userinfo', headers={'Authorization': f'Bearer {credentials.token}'})
     user_info = user_info_response.json()
     user_id, user_email, user_name = user_info.get('sub'), user_info.get('email', '').lower(), user_info.get('name')
+    
+    # Check permissions
     is_special = user_email in [email.lower() for email in SPECIAL_USER_EMAILS]
-    user = User(id=user_id, name=user_name, email=user_email, is_special=is_special)
+    can_edit = user_email in [email.lower() for email in EDITOR_EMAILS] # Check against the new list
+
+    # Create user with both permissions
+    user = User(id=user_id, name=user_name, email=user_email, is_special=is_special, can_edit=can_edit)
     users[user_id] = user
     login_user(user)
     return redirect(url_for('index'))
+
 @app.route("/logout")
 @login_required
 def logout():
@@ -136,11 +144,19 @@ def logout():
 # --- API Routes ---
 @app.route('/api/user-info', methods=['GET'])
 @login_required
-def get_user_info(): return jsonify({"email": current_user.email, "name": current_user.name, "isSpecial": current_user.is_special})
+def get_user_info(): 
+    # Send both permissions to the frontend
+    return jsonify({
+        "email": current_user.email, 
+        "name": current_user.name, 
+        "isSpecial": current_user.is_special,
+        "canEdit": current_user.can_edit 
+    })
 
 @app.route('/api/ba-names', methods=['GET'])
 @login_required
 def get_unique_ba_names():
+    # (function is unchanged)
     try:
         data = get_all_sheet_data(DATABASE_SHEET_ID, 'DATABASE')
         if not data or len(data) <= 1: return jsonify([])
@@ -151,7 +167,10 @@ def get_unique_ba_names():
 @app.route('/api/update-cell', methods=['POST'])
 @login_required
 def update_cell():
-    if not current_user.is_special: return jsonify(error="Permission denied"), 403
+    # Security Check: Use the new can_edit permission
+    if not current_user.can_edit:
+        return jsonify(error="Permission denied. You do not have rights to edit."), 403
+    
     if not sheet_api: return jsonify(error="API service not available"), 500
     data = request.get_json()
     row_index, col_index, new_value = data.get('rowIndex'), data.get('colIndex'), data.get('newValue')
@@ -171,8 +190,8 @@ def update_cell():
 @app.route('/api/search', methods=['POST'])
 @login_required
 def search_dashboard_data():
-    req_data = request.get_json()
-    month, week, ba_names, palcode = req_data.get('month'), req_data.get('week'), req_data.get('baNames', []), req_data.get('palcode', '')
+    # (The rest of this function is unchanged)
+    req_data, month, week, ba_names, palcode = request.get_json(), req_data.get('month'), req_data.get('week'), req_data.get('baNames', []), req_data.get('palcode', '')
     is_special_user = current_user.is_special
     if not month or not week: return jsonify({"error": "Month and Week are required."}), 400
     if not is_special_user and not ba_names: return jsonify({"error": "BA Name is required."}), 400
@@ -180,13 +199,11 @@ def search_dashboard_data():
     if all_sheet_data is None: return jsonify({"error": "Database sheet not found or API failed."}), 500
     log_user_event('searchDashboardData', req_data)
     search_month, search_week = month.strip().lower(), week.strip().lower()
-    search_ba_names_lower = [str(name).strip().lower() for name in ba_names if name]
-    search_palcode_lower = palcode.strip().lower() if palcode else ""
+    search_ba_names_lower, search_palcode_lower = [str(name).strip().lower() for name in ba_names if name], palcode.strip().lower() if palcode else ""
     PALCODE, MONTH, WEEK, BA_NAME, REG, VALID_FD, SUSPENDED_FD, RATE, GGR_PER_FD, TOTAL_GGR, SALARY, STATUS, ORIGINAL_ROW_NUM = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
     period_data_rows = [row for row in all_sheet_data[1:] if len(row) > WEEK and row[MONTH].strip().lower() == search_month and row[WEEK].strip().lower() == search_week]
     cache_key = f"{search_month}-{search_week}"
-    current_data_str = json.dumps(period_data_rows, sort_keys=True)
-    current_hash = hashlib.md5(current_data_str.encode('utf-8')).hexdigest()
+    current_data_str, current_hash = json.dumps(period_data_rows, sort_keys=True), hashlib.md5(current_data_str.encode('utf-8')).hexdigest()
     last_known_data = timestamp_cache.get(cache_key)
     if last_known_data and last_known_data['hash'] == current_hash:
         last_update_timestamp = last_known_data['timestamp']
@@ -197,8 +214,7 @@ def search_dashboard_data():
         timestamp_cache[cache_key] = {'hash': current_hash, 'timestamp': last_update_timestamp}
     ba_display_name = "ALL BAs" if is_special_user and not search_ba_names_lower else (f"MULTIPLE BAs ({len(search_ba_names_lower)})" if len(search_ba_names_lower) > 1 else (ba_names[0].strip().upper() if search_ba_names_lower else "N/A"))
     search_criteria_frontend, date_range_display = {'baNames': [name.strip().upper() for name in ba_names]}, calculate_date_range(month, week)
-    if not period_data_rows:
-        return jsonify({ "baNameDisplay": ba_display_name, "searchCriteria": search_criteria_frontend, "summary": {"totalRegistration": 0, "totalValidFd": 0, "totalSuspended": 0, "totalSalary": 0, "totalIncentives": 0}, "monthDisplay": search_month.upper(), "weekDisplay": search_week.upper(), "dateRangeDisplay": date_range_display, "status": "N/A", "resultsTable": [], "rankedBaList": [], "lastUpdate": last_update_timestamp, "message": "No records for selected period." })
+    if not period_data_rows: return jsonify({ "baNameDisplay": ba_display_name, "searchCriteria": search_criteria_frontend, "summary": {"totalRegistration": 0, "totalValidFd": 0, "totalSuspended": 0, "totalSalary": 0, "totalIncentives": 0}, "monthDisplay": search_month.upper(), "weekDisplay": search_week.upper(), "dateRangeDisplay": date_range_display, "status": "N/A", "resultsTable": [], "rankedBaList": [], "lastUpdate": last_update_timestamp, "message": "No records for selected period." })
     overall_total_valid_fd, ba_period_fds = 0, {}
     for row in period_data_rows:
         try:
@@ -222,13 +238,10 @@ def search_dashboard_data():
     results_for_table, summary_for_display = [], {"totalRegistration": 0, "totalValidFd": 0, "totalSuspended": 0, "totalSalary": 0, "totalIncentives": 0}
     for row in filtered_rows:
         try:
-            row_data = [row[i] if len(row) > i else "" for i in [PALCODE, BA_NAME, REG, VALID_FD, SUSPENDED_FD, RATE, GGR_PER_FD, TOTAL_GGR, SALARY, STATUS]]
+            row_data = [row[i] if len(row) > i else "" for i in [PALCODE, MONTH, WEEK, BA_NAME, REG, VALID_FD, SUSPENDED_FD, RATE, GGR_PER_FD, TOTAL_GGR, SALARY, STATUS]]
             original_row_num = row[ORIGINAL_ROW_NUM] if len(row) > ORIGINAL_ROW_NUM else -1
             results_for_table.append({'data': row_data, 'originalRowNum': original_row_num})
-            summary_for_display['totalRegistration'] += to_float(row[REG]) if len(row) > REG else 0
-            summary_for_display['totalValidFd'] += to_float(row[VALID_FD]) if len(row) > VALID_FD else 0
-            summary_for_display['totalSuspended'] += to_float(row[SUSPENDED_FD]) if len(row) > SUSPENDED_FD else 0
-            summary_for_display['totalSalary'] += to_float(row[SALARY]) if len(row) > SALARY else 0
+            summary_for_display['totalRegistration'] += to_float(row[REG]); summary_for_display['totalValidFd'] += to_float(row[VALID_FD]); summary_for_display['totalSuspended'] += to_float(row[SUSPENDED_FD]); summary_for_display['totalSalary'] += to_float(row[SALARY])
         except IndexError as e: logging.warning(f"Skipping row due to missing columns: {row} -> {e}")
     if overall_total_valid_fd >= 6000:
         if search_ba_names_lower: summary_for_display['totalIncentives'] = sum(ba_incentives_map.get(name.upper(), 0) for name in ba_names)

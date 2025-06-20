@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const baNameSuggestions = document.getElementById('baNameSuggestions');
 
     let isSpecialUser = false;
+    let canEditUser = false; // <-- NEW: Add a variable for the edit permission
     let selectedBaNamesState = [];
 
     // --- Special User UI Transformation Functions ---
@@ -41,6 +42,7 @@ document.addEventListener('DOMContentLoaded', function() {
         baNameInput.addEventListener('keydown', handleMultiSelectKeyDown);
         wrapper.addEventListener('click', handleWrapperClick);
     }
+
     function switchToSimpleView() {
         const wrapper = document.getElementById('baNameMultiSelectWrapper');
         if (!wrapper) return;
@@ -57,8 +59,16 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         input.removeEventListener('keydown', handleMultiSelectKeyDown);
     }
-    function handleMultiSelectKeyDown(e) { if (e.key === 'Enter' && baNameInput.value.trim() !== '') { e.preventDefault(); addTag(baNameInput.value.trim(), true); baNameInput.value = ''; } }
+
+    function handleMultiSelectKeyDown(e) {
+        if (e.key === 'Enter' && baNameInput.value.trim() !== '') {
+            e.preventDefault();
+            addTag(baNameInput.value.trim(), true);
+            baNameInput.value = '';
+        }
+    }
     function handleWrapperClick(e) { if (e.target.id === 'baNameMultiSelectWrapper') { baNameInput.focus(); } }
+    
     function updateVisibleTags() {
         const wrapper = document.getElementById('baNameMultiSelectWrapper');
         if (!wrapper) return;
@@ -81,6 +91,7 @@ document.addEventListener('DOMContentLoaded', function() {
             baNameInput.classList.remove('placeholder-hidden');
         }
     }
+
     function addTag(name, updateStateArray) {
         if (updateStateArray) {
             const lowerCaseName = name.toLowerCase();
@@ -111,9 +122,11 @@ document.addEventListener('DOMContentLoaded', function() {
         updateVisibleTags();
     }
     
-    // --- Initial Data Fetching & UI Setup ---
+    // --- Initial Data Fetching ---
     function setupUIForUser(userInfo) {
         isSpecialUser = userInfo.isSpecial;
+        canEditUser = userInfo.canEdit; // Set the new permission
+        
         userNameSpan.textContent = userInfo.name;
         userInfoDiv.style.display = 'flex';
         const activeTabButton = document.querySelector('.tab-button.active');
@@ -121,6 +134,7 @@ document.addEventListener('DOMContentLoaded', function() {
             switchToMultiSelectView();
         }
     }
+
     fetch('/api/user-info').then(res => {
         if (res.ok) return res.json();
         window.location.href = '/login'; 
@@ -232,7 +246,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- Data Handling and Display Functions ---
     function handleSearchSuccess(data) {
         searchButton.disabled = false;
         searchButton.textContent = 'SEARCH';
@@ -264,7 +277,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.error("Server Call Error:", error);
     }
     function determineSummaryStatus(tableData) {
-        const statusColumnIndex = 9;
+        const statusColumnIndex = 11; // Status is the 12th column in the data, so index 11
         if (!tableData || tableData.length === 0) return { text: 'N/A', class: '' };
         const statuses = new Set(tableData.map(row => row.data[statusColumnIndex]?.toString().trim().toLowerCase()).filter(Boolean));
         if (statuses.size === 0) return { text: 'N/A', class: '' };
@@ -357,7 +370,7 @@ document.addEventListener('DOMContentLoaded', function() {
             resultsTableContainer.innerHTML = '';
             if (data.resultsTable && data.resultsTable.length > 0) {
                 const table = document.createElement('table'), thead = document.createElement('thead'), tbody = document.createElement('tbody'), headerRow = document.createElement('tr');
-                const headers = ['PALCODE','BA Name','REG','Valid FD','Suspended FD','Rate','GGR Per FD','Total GGR','SALARY','Status'];
+                const headers = ['PALCODE','MONTH','WEEK','BA Name','REG','Valid FD','Suspended FD','Rate','GGR Per FD','Total GGR','SALARY','Status'];
                 const thNo = document.createElement('th'); thNo.textContent = 'No.'; headerRow.appendChild(thNo);
                 headers.forEach(text => { const th = document.createElement('th'); th.textContent = text.toUpperCase(); headerRow.appendChild(th); });
                 thead.appendChild(headerRow); table.appendChild(thead);
@@ -371,11 +384,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     rowData.forEach((cellData, cellIndex) => {
                         const td = document.createElement('td');
                         td.textContent = (cellData === null || cellData === undefined) ? '' : cellData;
-                        if (isSpecialUser) {
+                        if (canEditUser) { // Use the new canEditUser permission
                             td.setAttribute('contenteditable', 'true');
                             td.classList.add('editable-cell');
                             td.addEventListener('blur', (event) => {
-                                const cell = event.target, newValue = cell.textContent, parentRow = cell.closest('tr'), sheetRow = parentRow.dataset.originalRowNum, sheetCol = cellIndex; 
+                                const cell = event.target, newValue = cell.textContent, parentRow = cell.closest('tr'), sheetRow = parentRow.dataset.originalRowNum, sheetCol = cell.cellIndex - 1; 
+                                if (sheetRow < 0 || sheetCol < 0) return;
                                 cell.classList.add('saving');
                                 fetch('/api/update-cell', {
                                     method: 'POST',
@@ -401,7 +415,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 });
                             });
                         }
-                        if (cellIndex === 9) { 
+                        if (cellIndex === 11) { // Status column is now at index 11
                             let statusClass = '';
                             const statusText = cellData.toString().trim().toLowerCase().replace(/\s+/g, '-');
                             if (['paid', 'on-going', 'delayed', 'updating', 'invalid', 'unofficial'].includes(statusText)) { statusClass = `status-${statusText}`; }
