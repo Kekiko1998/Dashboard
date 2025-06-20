@@ -349,6 +349,4 @@ body.light-mode .results-table-container td > select {
 .results-table-container td[data-field="ggr_per_fd"],
 .results-table-container td[data-field="salary"] {
     cursor: not-allowed;
-    color: var(--text-color-subtle);
-    background-color: var(--table-stripe-bg) !important; /* Use !important to override hover effects */
 }
