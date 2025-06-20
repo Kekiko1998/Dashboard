@@ -145,6 +145,7 @@ def get_unique_ba_names():
 @app.route('/api/search', methods=['POST'])
 @login_required
 def search_dashboard_data():
+    # This route remains the same as your previous version
     req_data = request.get_json()
     month, week, ba_names, palcode = req_data.get('month'), req_data.get('week'), req_data.get('baNames', []), req_data.get('palcode', '')
     is_special_user = current_user.is_special
@@ -206,7 +207,6 @@ def search_dashboard_data():
     
     for row in filtered_rows:
         try:
-            # Send the full row data to the frontend
             results_for_table.append(row)
             summary_for_display['totalRegistration'] += to_float(row[REG]) if len(row) > REG else 0
             summary_for_display['totalValidFd'] += to_float(row[VALID_FD]) if len(row) > VALID_FD else 0
@@ -220,7 +220,8 @@ def search_dashboard_data():
     
     return jsonify({ "baNameDisplay": ba_display_name, "searchCriteria": search_criteria_frontend, "summary": summary_for_display, "monthDisplay": search_month.upper(), "weekDisplay": search_week.upper(), "dateRangeDisplay": date_range_display, "status": "Active", "resultsTable": results_for_table, "rankedBaList": final_ranked_ba_list, "lastUpdate": last_update_timestamp })
 
-# ======================= NEW ROUTE TO SAVE DATA =======================
+
+# ======================= REWRITTEN ROUTE TO SAVE DATA EFFICIENTLY =======================
 @app.route('/api/save_dashboard', methods=['POST'])
 @login_required
 def save_dashboard():
@@ -233,64 +234,65 @@ def save_dashboard():
         return jsonify({"success": False, "error": "No data received"}), 400
 
     try:
-        # 1. Fetch the entire current sheet data to avoid race conditions
+        # 1. Fetch the entire current sheet data to get the real row numbers and original values
         all_sheet_data = get_all_sheet_data(DATABASE_SHEET_ID, DATABASE_SHEET_NAME)
         if not all_sheet_data:
             return jsonify({"success": False, "error": "Could not fetch current database state."}), 500
 
-        # 2. Create a lookup dictionary from the client's updated rows for fast access
-        # The key is the PALCODE, which we assume is the unique identifier for a row.
-        updates_map = {row['palcode']: row for row in updated_rows_from_client}
+        # Create a map of PALCODE -> {row_data, original_row_index}
+        palcode_map = {row[0]: {'data': row, 'index': i + 1} for i, row in enumerate(all_sheet_data) if row}
 
-        # 3. Iterate through the master sheet data and apply updates
-        # Column indices must match your sheet exactly
-        PALCODE_COL, MONTH_COL, WEEK_COL, BA_NAME_COL, REG_COL, VALID_FD_COL, SUSPENDED_FD_COL, RATE_COL, GGR_PER_FD_COL, TOTAL_GGR_COL, SALARY_COL, STATUS_COL = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
+        # 2. Compare and build a list of cell-specific updates
+        update_requests = []
+        # Map field names from JS to their column index and letter
+        # IMPORTANT: 'rate', 'ggr_per_fd', and 'salary' are intentionally omitted to make them read-only
+        editable_cols = {
+            'month': {'idx': 1, 'col': 'B'}, 'week': {'idx': 2, 'col': 'C'}, 'ba_name': {'idx': 3, 'col': 'D'},
+            'reg': {'idx': 4, 'col': 'E'}, 'valid_fd': {'idx': 5, 'col': 'F'}, 'suspended_fd': {'idx': 6, 'col': 'G'},
+            'total_ggr': {'idx': 9, 'col': 'J'}, 'status': {'idx': 11, 'col': 'L'}
+        }
         
-        has_changes = False
-        for i, sheet_row in enumerate(all_sheet_data):
-            if i == 0: continue # Skip header row
-            if not sheet_row or len(sheet_row) <= PALCODE_COL: continue # Skip empty rows
-            
-            palcode = sheet_row[PALCODE_COL]
-            if palcode in updates_map:
-                # An update for this row exists, apply it
-                update = updates_map[palcode]
-                sheet_row[MONTH_COL] = update['month']
-                sheet_row[WEEK_COL] = update['week']
-                sheet_row[BA_NAME_COL] = update['ba_name']
-                sheet_row[REG_COL] = update['reg']
-                sheet_row[VALID_FD_COL] = update['valid_fd']
-                sheet_row[SUSPENDED_FD_COL] = update['suspended_fd']
-                sheet_row[RATE_COL] = update['rate']
-                sheet_row[GGR_PER_FD_COL] = update['ggr_per_fd']
-                sheet_row[TOTAL_GGR_COL] = update['total_ggr']
-                sheet_row[SALARY_COL] = update['salary']
-                sheet_row[STATUS_COL] = update['status']
-                has_changes = True
+        for client_row in updated_rows_from_client:
+            palcode = client_row.get('palcode')
+            if palcode in palcode_map:
+                original_row = palcode_map[palcode]['data']
+                original_index = palcode_map[palcode]['index']
 
-        if not has_changes:
-            return jsonify({"success": True, "message": "No changes to save."})
+                for field, col_info in editable_cols.items():
+                    col_idx = col_info['idx']
+                    # Ensure original row has this column before comparing
+                    original_value = original_row[col_idx] if len(original_row) > col_idx else ""
+                    client_value = client_row.get(field, "")
 
-        # 4. Write the entire modified dataset back to the sheet
-        # This is safer than updating individual cells as it's a single atomic-like operation.
-        range_to_update = f"{DATABASE_SHEET_NAME}!A1"
-        body = {'values': all_sheet_data}
-        sheet_api.values().update(
+                    # Compare values as strings to handle different data types consistently
+                    if str(original_value).strip() != str(client_value).strip():
+                        update_requests.append({
+                            "range": f"'{DATABASE_SHEET_NAME}'!{col_info['col']}{original_index}",
+                            "values": [[client_value]]
+                        })
+
+        # 3. If there are changes, execute the batch update
+        if not update_requests:
+            return jsonify({"success": True, "message": "No changes detected to save."})
+
+        batch_update_body = {
+            'valueInputOption': 'USER_ENTERED',
+            'data': update_requests
+        }
+        sheet_api.values().batchUpdate(
             spreadsheetId=DATABASE_SHEET_ID,
-            range=range_to_update,
-            valueInputOption='USER_ENTERED',
-            body=body
+            body=batch_update_body
         ).execute()
 
-        # 5. Log the successful update event
-        log_user_event('saveDashboardData', {'updated_palcodes': list(updates_map.keys())})
+        # 4. Log the successful update event
+        log_user_event('saveDashboardData', {'updated_palcodes': [r['palcode'] for r in updated_rows_from_client]})
         
-        return jsonify({"success": True, "message": "Dashboard updated successfully!"})
+        return jsonify({"success": True, "message": f"Successfully updated {len(update_requests)} cells."})
 
     except Exception as e:
         logging.error(f"Error saving dashboard data: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
-# =========================================================================
+# =========================================================================================
 
 def log_user_event(function_name, inputs):
     if not sheet_api: return
@@ -302,7 +304,7 @@ def log_user_event(function_name, inputs):
         user_email = current_user.email if current_user.is_authenticated else "Anonymous"
         
         if function_name == 'saveDashboardData':
-            formatted_inputs = f"Updated {len(inputs.get('updated_palcodes', []))} rows."
+            formatted_inputs = f"Updated data for {len(inputs.get('updated_palcodes', []))} palcodes."
         else:
             ba_names_str = ', '.join(inputs.get('baNames', [])) if inputs.get('baNames') else "N/A"
             formatted_inputs = f"Month - {inputs.get('month', 'N/A')}, Week - {inputs.get('week', 'N/A').replace('week ', '')}, Ba Name(s) - {ba_names_str}, Palcode - {inputs.get('palcode', 'N/A') or 'N/A'}"

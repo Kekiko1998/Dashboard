@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const dashboardSearchError = document.getElementById('dashboardSearchError');
     const darkModeToggleButton = document.getElementById('darkModeToggle');
     const baNameSuggestions = document.getElementById('baNameSuggestions');
-    // --- NEW ELEMENTS FOR EDITING ---
+    // --- ELEMENTS FOR EDITING ---
     const tableControls = document.getElementById('tableControls');
     const saveButton = document.getElementById('saveButton');
     const saveStatusMessage = document.getElementById('saveStatusMessage');
@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let selectedBaNamesState = [];
     const statusOptions = ['PAID', 'DELAYED', 'UPDATING', 'INVALID', 'UNOFFICIAL'];
 
-    // --- Special User UI Transformation Functions (Your existing code, unchanged) ---
+    // --- Special User UI Transformation Functions ---
     function switchToMultiSelectView() {
         if (document.getElementById('baNameMultiSelectWrapper')) return;
         const currentInput = document.getElementById('baNameInput');
@@ -148,7 +148,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }).catch(err => console.error('Error fetching BA names:', err));
     }
     
-    // --- UI Management (Unchanged) ---
+    // --- UI Management ---
     function setDarkMode(isDark) {
         if (isDark) { document.body.classList.remove('light-mode'); darkModeToggleButton.textContent = '☀️'; localStorage.setItem('dashboardTheme', 'dark'); }
         else { document.body.classList.add('light-mode'); darkModeToggleButton.textContent = '🌙'; localStorage.setItem('dashboardTheme', 'light'); }
@@ -248,9 +248,8 @@ document.addEventListener('DOMContentLoaded', function() {
         return { text: 'MIXED', class: '' };
     }
     
-    // --- ================ HEAVILY MODIFIED FUNCTION ================ ---
     function populateDashboardWithData(data) {
-        // --- Part 1: Populate Left Panel (Your existing code) ---
+        // --- Part 1: Populate Left Panel ---
         const baNameDisplay = document.getElementById('baNameDisplay'), totalRegistrationValue = document.getElementById('totalRegistrationValue'), totalValidFdValue = document.getElementById('totalValidFdValue'), totalSuspendedValue = document.getElementById('totalSuspendedValue'), totalSalaryValue = document.getElementById('totalSalaryValue'), totalIncentiveValue = document.getElementById('totalIncentiveValue'), monthDisplay = document.getElementById('monthDisplay'), weekDisplay = document.getElementById('weekDisplay'), dateRangeDisplay = document.getElementById('dateRangeDisplay'), statusValue = document.getElementById('statusValue'), lastUpdateValue = document.getElementById('lastUpdateValue'), baRankingListDiv = document.getElementById('baRankingList'), resultsTableContainer = document.getElementById('resultsTableContainer');
         if(baNameDisplay) { /* ... (your existing baNameDisplay logic) ... */ }
         const summary = data.summary || {};
@@ -272,15 +271,19 @@ document.addEventListener('DOMContentLoaded', function() {
         // --- Part 2: Populate Right Panel (Table) with EDITING features ---
         resultsTableContainer.innerHTML = '';
         if (isSpecialUser && data.resultsTable && data.resultsTable.length > 0) {
-            tableControls.style.display = 'flex'; // Show the Save button
+            tableControls.style.display = 'flex';
         } else {
-            tableControls.style.display = 'none'; // Hide it otherwise
+            tableControls.style.display = 'none';
         }
         
         if (data.resultsTable && data.resultsTable.length > 0) {
             const table = document.createElement('table'), thead = document.createElement('thead'), tbody = document.createElement('tbody'), headerRow = document.createElement('tr');
             const headers = ['PALCODE','MONTH','WEEK','BA Name','REG','Valid FD','Suspended FD','Rate','GGR Per FD','Total GGR','SALARY','Status'];
-            const editableColumns = ['MONTH','WEEK','BA Name','REG','Valid FD','Suspended FD','Rate','GGR Per FD','Total GGR','SALARY'];
+            
+            // ======================= MODIFIED LINE =======================
+            // Define which columns are editable. Rate, GGR Per FD, and Salary are now excluded.
+            const editableColumns = ['MONTH', 'WEEK', 'BA Name', 'REG', 'Valid FD', 'Suspended FD', 'Total GGR'];
+            // =============================================================
 
             // Create Headers
             const thNo = document.createElement('th'); thNo.textContent = 'No.'; headerRow.appendChild(thNo);
@@ -290,20 +293,18 @@ document.addEventListener('DOMContentLoaded', function() {
             // Create Rows and Cells
             data.resultsTable.forEach((rowData, rowIndex) => {
                 const tr = document.createElement('tr');
-                tr.dataset.palcode = rowData[0]; // Set PALCODE as a data attribute for identification
+                tr.dataset.palcode = rowData[0];
                 tr.classList.add('result-row-animate'); tr.style.animationDelay = `${rowIndex * 0.05}s`;
                 
-                // Row number cell
                 const tdNo = document.createElement('td'); tdNo.textContent = rowIndex + 1; tr.appendChild(tdNo);
 
-                // Data cells
                 headers.forEach((header, cellIndex) => {
                     const td = document.createElement('td');
-                    td.dataset.field = header.toLowerCase().replace(/ /g, '_'); // e.g., 'ba_name'
+                    const fieldName = header.toLowerCase().replace(/ /g, '_');
+                    td.dataset.field = fieldName;
                     const cellData = (rowData[cellIndex] === null || rowData[cellIndex] === undefined) ? '' : rowData[cellIndex];
 
                     if (isSpecialUser && header === 'Status') {
-                        // Create a dropdown for the Status column
                         const select = document.createElement('select');
                         statusOptions.forEach(option => {
                             const optionEl = document.createElement('option');
@@ -316,7 +317,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         });
                         td.appendChild(select);
                     } else {
-                        // For other columns, just set the text content
                         td.textContent = cellData;
                         if (isSpecialUser && editableColumns.includes(header)) {
                             td.contentEditable = "true";
@@ -335,7 +335,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if(dashboardDataDisplay) { dashboardDataDisplay.style.opacity = '0'; setTimeout(() => { dashboardDataDisplay.style.opacity = '1'; }, 50); }
     }
     
-    // --- ================ NEW SAVE FUNCTIONALITY ================ ---
+    // --- SAVE FUNCTIONALITY ---
     if (saveButton) {
         saveButton.addEventListener('click', async () => {
             saveButton.disabled = true;
@@ -346,6 +346,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const tableRows = document.querySelectorAll('#resultsTableContainer tbody tr');
 
             tableRows.forEach(row => {
+                // This logic is safe because the backend is the final gatekeeper.
+                // It will gather all data from the row, but the backend will only use the editable fields.
                 const rowData = {
                     palcode: row.dataset.palcode,
                     month: row.querySelector('[data-field="month"]').textContent,
@@ -374,7 +376,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 const result = await response.json();
                 if (result.success) {
-                    saveStatusMessage.textContent = 'Save Successful!';
+                    saveStatusMessage.textContent = result.message || 'Save Successful!';
                     saveStatusMessage.className = 'success';
                 } else {
                     throw new Error(result.error || 'Unknown error occurred.');
@@ -385,11 +387,34 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('Save failed:', error);
             } finally {
                 saveButton.disabled = false;
-                setTimeout(() => { saveStatusMessage.textContent = ''; saveStatusMessage.className = ''; }, 5000);
+                setTimeout(() => { saveStatusMessage.textContent = ''; saveStatusMessage.className = ''; }, 7000);
             }
         });
     }
 
-    // --- Animation Helper (Unchanged) ---
-    function animateValue(element, start, end, duration, isCurrency = false) { /* ... (your existing animation logic) ... */ }
+    // --- Animation Helper ---
+    function animateValue(element, start, end, duration, isCurrency = false) {
+        if (!element || typeof end !== 'number' || isNaN(end)) {
+             if(element && isCurrency) element.textContent = `₱ 0.00`;
+             else if(element) element.textContent = `0`;
+             return;
+        }
+        let startTimestamp = null;
+        const step = (timestamp) => {
+            if (!startTimestamp) startTimestamp = timestamp;
+            const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+            let currentValue = Math.floor(progress * (end - start) + start);
+            let displayValue;
+            if (isCurrency) {
+                displayValue = `₱ ${currentValue.toLocaleString()}`;
+                if (progress >= 1) { displayValue = `₱ ${parseFloat(end).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`; }
+            } else {
+                displayValue = currentValue.toLocaleString();
+                if (progress >= 1) { displayValue = end.toLocaleString(); }
+            }
+            element.textContent = displayValue;
+            if (progress < 1) { window.requestAnimationFrame(step); }
+        };
+        window.requestAnimationFrame(step);
+    }
 });
