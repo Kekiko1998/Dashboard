@@ -316,7 +316,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         // Add a separator after each name
                         const separatorSpan = document.createElement('span');
                         separatorSpan.className = 'ba-name-scroll-separator';
-                        separatorSpan.textContent = '•';
+                        separatorSpan.textContent = '|';
                         namesContainer.appendChild(separatorSpan);
                     });
                 };
