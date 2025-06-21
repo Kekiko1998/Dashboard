@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const statusOptions = ['PAID', 'DELAYED', 'UPDATING', 'INVALID', 'UNOFFICIAL'];
 
     // --- Special User UI Transformation Functions ---
+    // ... (This section is unchanged) ...
     function switchToMultiSelectView() {
         if (document.getElementById('baNameMultiSelectWrapper')) return;
         const currentInput = document.getElementById('baNameInput');
@@ -183,9 +184,34 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
+    // ================== NEW FUNCTION FOR WEEK 5 LOGIC ==================
+    function handleMonthChange() {
+        const selectedMonth = monthSelect.value;
+        const week5Option = document.getElementById('week5Option');
+
+        if (week5Option) {
+            if (selectedMonth.toLowerCase() === 'june') {
+                week5Option.style.display = 'block';
+            } else {
+                week5Option.style.display = 'none';
+                // If Week 5 was selected, reset the week dropdown to avoid confusion
+                if (weekSelect.value === 'Week 5') {
+                    weekSelect.value = ''; // Resets to the "SELECT WEEK" placeholder
+                }
+            }
+        }
+    }
+    // Add event listener to the month dropdown
+    monthSelect.addEventListener('change', handleMonthChange);
+    // Call the function once on page load to set the initial state correctly
+    handleMonthChange();
+    // ===================================================================
+
+
     if (searchButton) { searchButton.addEventListener('click', performSearch); }
 
     // --- Search & Data Handling ---
+    // ... (The rest of the script, from performSearch onwards, is unchanged) ...
     function performSearch() {
         const month = monthSelect.value, week = weekSelect.value, palcode = palcodeInput.value.trim();
         let baNamesToSearch;
@@ -264,12 +290,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function populateDashboardWithData(data) {
-        // --- Part 1: Populate Left Panel ---
         const baNameDisplay = document.getElementById('baNameDisplay'), totalRegistrationValue = document.getElementById('totalRegistrationValue'), totalValidFdValue = document.getElementById('totalValidFdValue'), totalSuspendedValue = document.getElementById('totalSuspendedValue'), totalSalaryValue = document.getElementById('totalSalaryValue'), totalIncentiveValue = document.getElementById('totalIncentiveValue'), monthDisplay = document.getElementById('monthDisplay'), weekDisplay = document.getElementById('weekDisplay'), dateRangeDisplay = document.getElementById('dateRangeDisplay'), statusValue = document.getElementById('statusValue'), lastUpdateValue = document.getElementById('lastUpdateValue'), baRankingListDiv = document.getElementById('baRankingList'), resultsTableContainer = document.getElementById('resultsTableContainer');
         const commissionCard = document.getElementById('commissionCard');
         const totalCommissionValue = document.getElementById('totalCommissionValue');
 
-        // FIX 1: The check for the commission card's visibility was moved here from the top level.
         if (commissionCard) {
             commissionCard.style.display = isSpecialUser ? 'flex' : 'none';
         }
@@ -315,7 +339,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (totalCommissionValue && isSpecialUser) {
             animateValue(totalCommissionValue, 0, summary.totalCommission || 0, 700);
         }
-        // FIX 2: Added the missing closing brace for the 'if (totalCommissionValue...)' block.
         
         if(monthDisplay) monthDisplay.textContent = data.monthDisplay || "N/A";
         if(weekDisplay) weekDisplay.textContent = data.weekDisplay || "N/A";
@@ -350,7 +373,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        // --- Part 2: Populate Right Panel (Table) with EDITING features ---
         resultsTableContainer.innerHTML = '';
         if (isSpecialUser && data.resultsTable && data.resultsTable.length > 0) {
             tableControls.style.display = 'flex';
@@ -412,7 +434,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if(dashboardDataDisplay) { dashboardDataDisplay.style.opacity = '0'; setTimeout(() => { dashboardDataDisplay.style.opacity = '1'; }, 50); }
     }
     
-    // --- SAVE FUNCTIONALITY ---
     if (saveButton) {
         saveButton.addEventListener('click', async () => {
             saveButton.disabled = true;
@@ -467,7 +488,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- Animation Helper ---
     function animateValue(element, start, end, duration, isCurrency = false) {
         if (!element || typeof end !== 'number' || isNaN(end)) {
              if(element && isCurrency) element.textContent = `₱ 0.00`;

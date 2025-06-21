@@ -45,7 +45,13 @@
                         </select>
                         <select id="weekSelect">
                             <option value="" disabled selected>SELECT WEEK</option>
-                            <option value="Week 1">Week 1</option><option value="Week 2">Week 2</option><option value="Week 3">Week 3</option><option value="Week 4">Week 4</option>
+                            <option value="Week 1">Week 1</option>
+                            <option value="Week 2">Week 2</option>
+                            <option value="Week 3">Week 3</option>
+                            <option value="Week 4">Week 4</option>
+                            <!-- ================== NEW WEEK 5 OPTION ================== -->
+                            <option id="week5Option" value="Week 5">Week 5</option>
+                            <!-- ======================================================= -->
                         </select>
                         <input type="text" id="baNameInput" placeholder="ENTER BA NAME" autocomplete="off" list="baNameSuggestions">
                         <datalist id="baNameSuggestions"></datalist>
@@ -79,9 +85,9 @@
                   <div class="summary-card"><span class="summary-label">TOTAL SALARY</span><span class="summary-value" id="totalSalaryValue">0</span></div>
                   <div class="summary-card"><span class="summary-label">INCENTIVES</span><span class="summary-value" id="totalIncentiveValue">₱0.00</span></div>
                   <div id="commissionCard" class="summary-card" style="display: none;">
-                  <span class="summary-label">COMMISSION</span>
-                  <span class="summary-value" id="totalCommissionValue">0</span>
-                </div>
+                    <span class="summary-label">COMMISSION</span>
+                    <span class="summary-value" id="totalCommissionValue">0</span>
+                  </div>
                 </div>
                 <div class="filter-display">
                     <span id="monthDisplay">MONTH</span>
@@ -95,12 +101,10 @@
                 </div>
               </div>
               <div class="right-panel">
-                <!-- ================== NEW SAVE CONTROLS ================== -->
                 <div id="tableControls" class="table-controls" style="display: none;">
                     <button id="saveButton" class="save-button">Save Changes</button>
                     <span id="saveStatusMessage"></span>
                 </div>
-                <!-- ======================================================= -->
                 <div id="resultsTableContainer" class="results-table-container"></div>
                 <div class="last-update-display">LAST UPDATE: <span id="lastUpdateValue">N/A</span></div>
               </div>
