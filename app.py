@@ -18,7 +18,6 @@ DATABASE_SHEET_ID = '1ZufXPOUcoW2czQ0vcpZwvJNHngV4GHbbSl9q46UwF8g'
 DATABASE_SHEET_NAME = 'DATABASE'
 LOGS_SHEET_ID = '1ZufXPOUcoW2czQ0vcpZwvJNHngV4GHbbSl9q46UwF8g'
 LOGS_SHEET_NAME = 'Web App Logs'
-# ================== NEW CONFIGURATION FOR USER MANAGEMENT ==================
 USERS_SHEET_NAME = 'Users'
 # Root admins have hardcoded admin rights and cannot be changed via the UI.
 ADMIN_USER_EMAILS = ['harrypobreza@gmail.com'] 
@@ -29,7 +28,6 @@ ALL_PERMISSIONS = {
     'EDIT_TABLE',
     'VIEW_COMMISSION'
 }
-# =========================================================================
 YOUR_TIMEZONE = 'Asia/Manila'
 
 # --- Flask App Initialization ---
@@ -157,7 +155,8 @@ def callback():
         if len(sheet_row) > 4 and sheet_row[4]:
             permissions = set(p.strip() for p in sheet_row[4].split(','))
     else:
-        new_row = [user_id, user_email, user_name, str(is_admin).upper(), ""]
+        # New user, add them to the sheet with default empty permissions
+        new_row = [user_id, user_email, user_name, str(is_admin).upper(), ""] # Empty permissions
         sheet_api.values().append(
             spreadsheetId=DATABASE_SHEET_ID,
             range=f"{USERS_SHEET_NAME}!A1",
@@ -196,7 +195,7 @@ def get_all_users():
     
     user_data = get_sheet_data(DATABASE_SHEET_ID, f"{USERS_SHEET_NAME}!B:E")
     if not user_data or len(user_data) < 2:
-        return jsonify([])
+        return jsonify({"users": [], "all_permissions": list(ALL_PERMISSIONS)})
     
     users_list = []
     for row in user_data[1:]:
