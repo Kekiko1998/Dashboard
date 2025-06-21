@@ -19,27 +19,61 @@ document.addEventListener('DOMContentLoaded', function() {
     const dashboardSearchError = document.getElementById('dashboardSearchError');
     const darkModeToggleButton = document.getElementById('darkModeToggle');
     const baNameSuggestions = document.getElementById('baNameSuggestions');
-    // ================== NEW ADMIN ELEMENTS ==================
     const adminTabBtn = document.getElementById('adminTabBtn');
     const userManagementTableContainer = document.getElementById('userManagementTableContainer');
     const adminStatusMessage = document.getElementById('adminStatusMessage');
-    // ======================================================
-    // --- ELEMENTS FOR EDITING ---
     const tableControls = document.getElementById('tableControls');
     const saveButton = document.getElementById('saveButton');
     const saveStatusMessage = document.getElementById('saveStatusMessage');
 
-    // ================== NEW STATE VARIABLES ==================
+    // --- State Variables ---
     let isAdmin = false;
-    let isSpecialUser = false;
-    // =======================================================
+    let userPermissions = new Set(); // Use a Set for fast permission lookups
     let selectedBaNamesState = [];
     const statusOptions = ['PAID', 'DELAYED', 'UPDATING', 'INVALID', 'UNOFFICIAL'];
 
+    // --- Initial Data Fetching ---
+    function setupUIForUser(userInfo) {
+        isAdmin = userInfo.isAdmin;
+        userPermissions = new Set(userInfo.permissions);
+
+        userNameSpan.textContent = userInfo.name;
+        userInfoDiv.style.display = 'flex';
+
+        if (isAdmin) {
+            adminTabBtn.style.display = 'block';
+        }
+
+        const activeTabButton = document.querySelector('.tab-button.active');
+        if (userPermissions.has('MULTI_SELECT') && activeTabButton && activeTabButton.id === 'homeTabBtn') {
+            switchToMultiSelectView();
+        }
+    }
+
+    fetch('/api/user-info').then(response => {
+        if (response.status === 401) { window.location.href = '/login'; return Promise.reject('User not logged in'); }
+        if (!response.ok) { throw new Error('Network response was not ok'); }
+        return response.json();
+    }).then(userInfo => {
+        if (userInfo) { setupUIForUser(userInfo); populateBaNameSuggestions(); }
+    }).catch(error => console.error("Initialization failed:", error));
+
+    function populateBaNameSuggestions() {
+        fetch('/api/ba-names').then(res => res.json()).then(names => {
+            if (baNameSuggestions && names && names.length > 0) {
+                baNameSuggestions.innerHTML = '';
+                names.forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    baNameSuggestions.appendChild(option);
+                });
+            }
+        }).catch(err => console.error('Error fetching BA names:', err));
+    }
+
     // --- Special User UI Transformation Functions ---
-    // ... (This section is unchanged) ...
     function switchToMultiSelectView() {
-        if (document.getElementById('baNameMultiSelectWrapper')) return;
+        if (document.getElementById('baNameMultiSelectWrapper') || !userPermissions.has('MULTI_SELECT')) return;
         const currentInput = document.getElementById('baNameInput');
         const originalParent = currentInput.parentNode;
         const wrapper = document.createElement('div');
@@ -56,6 +90,7 @@ document.addEventListener('DOMContentLoaded', function() {
         wrapper.addEventListener('click', handleWrapperClick);
     }
     function switchToSimpleView() {
+        if (!userPermissions.has('MULTI_SELECT')) return;
         const wrapper = document.getElementById('baNameMultiSelectWrapper');
         if (!wrapper) return;
         const input = document.getElementById('baNameInput');
@@ -125,47 +160,7 @@ document.addEventListener('DOMContentLoaded', function() {
         updateVisibleTags();
     }
     
-    // --- Initial Data Fetching ---
-    // ================== UPDATED USER SETUP FUNCTION ==================
-    function setupUIForUser(userInfo) {
-        isSpecialUser = userInfo.isSpecial;
-        isAdmin = userInfo.isAdmin; // Store admin status
-        userNameSpan.textContent = userInfo.name;
-        userInfoDiv.style.display = 'flex';
-
-        // Show Admin tab if user is an admin
-        if (isAdmin && adminTabBtn) {
-            adminTabBtn.style.display = 'block';
-        }
-
-        const activeTabButton = document.querySelector('.tab-button.active');
-        if (isSpecialUser && activeTabButton && activeTabButton.id === 'homeTabBtn') {
-            switchToMultiSelectView();
-        }
-    }
-    // =================================================================
-    fetch('/api/user-info').then(response => {
-        if (response.status === 401) { window.location.href = '/login'; return Promise.reject('User not logged in'); }
-        if (!response.ok) { throw new Error('Network response was not ok'); }
-        return response.json();
-    }).then(userInfo => {
-        if (userInfo) { setupUIForUser(userInfo); populateBaNameSuggestions(); }
-    }).catch(error => console.error("Initialization failed:", error));
-    
-    function populateBaNameSuggestions() {
-        fetch('/api/ba-names').then(res => res.json()).then(names => {
-            if (baNameSuggestions && names && names.length > 0) {
-                baNameSuggestions.innerHTML = '';
-                names.forEach(name => {
-                    const option = document.createElement('option');
-                    option.value = name;
-                    baNameSuggestions.appendChild(option);
-                });
-            }
-        }).catch(err => console.error('Error fetching BA names:', err));
-    }
-    
-    // --- UI MANAGEMENT (DARK MODE & TABS) ---
+    // --- UI MANAGEMENT (DARK MODE, TABS, WEEK 5) ---
     function setDarkMode(isDark) {
         if (isDark) {
             document.body.classList.remove('light-mode');
@@ -187,26 +182,26 @@ document.addEventListener('DOMContentLoaded', function() {
         setDarkMode(true);
     }
 
-    // ================== UPDATED showTab FUNCTION ==================
     window.showTab = function(tabId, clickedButton) {
         document.querySelectorAll(".tab-content").forEach(tab => tab.classList.remove('active-content'));
         document.querySelectorAll(".tab-button").forEach(btn => btn.classList.remove("active"));
         document.getElementById(tabId).classList.add('active-content');
         clickedButton.classList.add("active");
+
         if (tabId === 'homeArea') {
-            homeContentCentered.appendChild(homeTitleContainer); homeContentCentered.appendChild(homeSearchControlsContainer);
-            if (isSpecialUser) switchToMultiSelectView();
+            homeContentCentered.appendChild(homeTitleContainer);
+            homeContentCentered.appendChild(homeSearchControlsContainer);
+            if (userPermissions.has('MULTI_SELECT')) switchToMultiSelectView();
         } else {
-            topLeftDynamicContent.appendChild(homeTitleContainer); topLeftDynamicContent.appendChild(homeSearchControlsContainer);
-            if (isSpecialUser) switchToSimpleView();
+            topLeftDynamicContent.appendChild(homeTitleContainer);
+            topLeftDynamicContent.appendChild(homeSearchControlsContainer);
+            if (userPermissions.has('MULTI_SELECT')) switchToSimpleView();
         }
 
-        // If admin tab is clicked, load the user panel
         if (tabId === 'adminArea' && isAdmin) {
             loadUserManagementPanel();
         }
     };
-    // ===============================================================
 
     function handleMonthChange() {
         const selectedMonth = monthSelect.value;
@@ -228,30 +223,147 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (searchButton) { searchButton.addEventListener('click', performSearch); }
 
+    // --- Admin Panel Functions ---
+    function loadUserManagementPanel() {
+        userManagementTableContainer.innerHTML = '<div class="loading-indicator">⏳ Loading users...</div>';
+        adminStatusMessage.textContent = '';
+        
+        fetch('/api/users')
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) throw new Error(data.error);
+                buildUserTable(data.users, data.all_permissions);
+            })
+            .catch(error => {
+                userManagementTableContainer.innerHTML = `<p class="error-message-main">❌ ${error.message}</p>`;
+            });
+    }
+
+    function buildUserTable(users, allPermissions) {
+        userManagementTableContainer.innerHTML = '';
+        const table = document.createElement('table');
+        table.id = 'userManagementTable';
+        
+        const thead = document.createElement('thead');
+        let headerRowHtml = '<tr><th>Name</th><th>Email</th>';
+        allPermissions.forEach(perm => {
+            headerRowHtml += `<th>${perm.replace('_', ' ')}</th>`;
+        });
+        headerRowHtml += '<th>Action</th></tr>';
+        thead.innerHTML = headerRowHtml;
+        table.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
+        users.forEach(user => {
+            const tr = document.createElement('tr');
+            tr.dataset.email = user.email;
+
+            let rowHtml = `<td>${user.name}</td><td>${user.email}</td>`;
+            const userPerms = new Set(user.permissions);
+            
+            allPermissions.forEach(perm => {
+                const isChecked = userPerms.has(perm) ? 'checked' : '';
+                const isDisabled = user.is_admin ? 'disabled' : '';
+                rowHtml += `
+                    <td>
+                        <label class="switch">
+                            <input type="checkbox" data-permission="${perm}" ${isChecked} ${isDisabled}>
+                            <span class="slider round"></span>
+                        </label>
+                    </td>`;
+            });
+
+            const saveButtonDisabled = user.is_admin ? 'disabled' : '';
+            rowHtml += `<td><button class="save-permissions-btn" ${saveButtonDisabled}>Save</button></td>`;
+            tr.innerHTML = rowHtml;
+            tbody.appendChild(tr);
+        });
+
+        table.appendChild(tbody);
+        userManagementTableContainer.appendChild(table);
+
+        document.querySelectorAll('.save-permissions-btn').forEach(button => {
+            button.addEventListener('click', handlePermissionSave);
+        });
+    }
+
+    function handlePermissionSave(event) {
+        const button = event.target;
+        const row = button.closest('tr');
+        const email = row.dataset.email;
+        
+        const selectedPermissions = [];
+        row.querySelectorAll('input[type="checkbox"]:checked').forEach(checkbox => {
+            selectedPermissions.push(checkbox.dataset.permission);
+        });
+
+        button.textContent = 'Saving...';
+        button.disabled = true;
+        adminStatusMessage.textContent = '';
+
+        fetch('/api/update_user_permission', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ email: email, permissions: selectedPermissions })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                adminStatusMessage.textContent = data.message;
+                adminStatusMessage.className = 'admin-status-message success';
+            } else {
+                throw new Error(data.error);
+            }
+        })
+        .catch(error => {
+            adminStatusMessage.textContent = `Error: ${error.message}`;
+            adminStatusMessage.className = 'admin-status-message error';
+        })
+        .finally(() => {
+            button.textContent = 'Save';
+            if (!row.querySelector('input[type=checkbox]').disabled) {
+                button.disabled = false;
+            }
+            setTimeout(() => { adminStatusMessage.textContent = ''; adminStatusMessage.className = 'admin-status-message'; }, 5000);
+        });
+    }
+
     // --- Search & Data Handling ---
-    // ... (This section is unchanged) ...
     function performSearch() {
         const month = monthSelect.value, week = weekSelect.value, palcode = palcodeInput.value.trim();
         let baNamesToSearch;
         const baNameInputValue = document.getElementById('baNameInput').value.trim();
-        if (isSpecialUser) {
+        if (userPermissions.has('MULTI_SELECT')) {
             if (document.getElementById('baNameMultiSelectWrapper')) {
                 if (baNameInputValue !== '') { addTag(baNameInputValue, true); document.getElementById('baNameInput').value = ''; }
                 baNamesToSearch = selectedBaNamesState;
             } else {
                 baNamesToSearch = baNameInputValue ? [baNameInputValue] : [];
             }
-        } else { baNamesToSearch = baNameInputValue ? [baNameInputValue] : []; }
-        const errorTarget = document.getElementById('homeErrorMessage'); errorTarget.textContent = ''; 
+        } else {
+             baNamesToSearch = baNameInputValue ? [baNameInputValue] : [];
+        }
+
+        const errorTarget = document.getElementById('homeErrorMessage'); 
+        errorTarget.textContent = ''; 
         let missingFields = [];
         if (!month) missingFields.push("MONTH");
         if (!week) missingFields.push("WEEK");
-        if (!isSpecialUser && baNamesToSearch.length === 0) missingFields.push("BA NAME");
-        if (missingFields.length > 0) { errorTarget.textContent = `❌ Please select: ${missingFields.join(', ')}.`; return; }
-        searchButton.disabled = true; searchButton.textContent = 'SEARCHING...';
+        if (!userPermissions.has('SEARCH_ALL') && baNamesToSearch.length === 0) {
+             missingFields.push("BA NAME");
+        }
+        if (missingFields.length > 0) { 
+            errorTarget.textContent = `❌ Please select: ${missingFields.join(', ')}.`; 
+            return; 
+        }
+
+        searchButton.disabled = true; 
+        searchButton.textContent = 'SEARCHING...';
         showTab('dashboardDisplayArea', dashboardTabBtn); 
-        dashboardPlaceholder.style.display = 'none'; dashboardDataDisplay.style.display = 'none';
-        dashboardSearchError.style.display = 'none'; loadingIndicator.style.display = 'flex';
+        dashboardPlaceholder.style.display = 'none'; 
+        dashboardDataDisplay.style.display = 'none';
+        dashboardSearchError.style.display = 'none'; 
+        loadingIndicator.style.display = 'flex';
         const searchPayload = { month: month, week: week, baNames: baNamesToSearch, palcode: palcode };
         fetch('/api/search', {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(searchPayload),
@@ -307,119 +419,13 @@ document.addEventListener('DOMContentLoaded', function() {
         return { text: 'MIXED', class: '' };
     }
     
-    // ================== NEW ADMIN PANEL FUNCTIONS ==================
-    function loadUserManagementPanel() {
-        userManagementTableContainer.innerHTML = '<div class="loading-indicator">⏳ Loading users...</div>';
-        adminStatusMessage.textContent = '';
-        
-        fetch('/api/users')
-            .then(res => {
-                if (!res.ok) throw new Error('Failed to fetch users.');
-                return res.json();
-            })
-            .then(users => {
-                buildUserTable(users);
-            })
-            .catch(error => {
-                userManagementTableContainer.innerHTML = `<p class="error-message-main">❌ ${error.message}</p>`;
-            });
-    }
-
-    function buildUserTable(users) {
-        userManagementTableContainer.innerHTML = '';
-        const table = document.createElement('table');
-        table.id = 'userManagementTable';
-        table.innerHTML = `
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Special Access</th>
-                </tr>
-            </thead>
-        `;
-        const tbody = document.createElement('tbody');
-        
-        users.forEach(user => {
-            const tr = document.createElement('tr');
-            
-            const tdName = document.createElement('td');
-            tdName.textContent = user.name;
-            tr.appendChild(tdName);
-
-            const tdEmail = document.createElement('td');
-            tdEmail.textContent = user.email;
-            tr.appendChild(tdEmail);
-
-            const tdPermission = document.createElement('td');
-            const switchLabel = document.createElement('label');
-            switchLabel.className = 'switch';
-
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.checked = user.is_special;
-            checkbox.dataset.email = user.email; // Store email for the API call
-
-            checkbox.addEventListener('change', handlePermissionChange);
-
-            const slider = document.createElement('span');
-            slider.className = 'slider round';
-
-            switchLabel.appendChild(checkbox);
-            switchLabel.appendChild(slider);
-            tdPermission.appendChild(switchLabel);
-            tr.appendChild(tdPermission);
-
-            tbody.appendChild(tr);
-        });
-
-        table.appendChild(tbody);
-        userManagementTableContainer.appendChild(table);
-    }
-
-    function handlePermissionChange(event) {
-        const checkbox = event.target;
-        const email = checkbox.dataset.email;
-        const newStatus = checkbox.checked;
-
-        checkbox.disabled = true; // Prevent multiple clicks
-        adminStatusMessage.textContent = 'Updating...';
-        adminStatusMessage.className = 'admin-status-message saving';
-
-        fetch('/api/update_user_permission', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ email: email, is_special: newStatus })
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                adminStatusMessage.textContent = data.message;
-                adminStatusMessage.className = 'admin-status-message success';
-            } else {
-                throw new Error(data.error);
-            }
-        })
-        .catch(error => {
-            adminStatusMessage.textContent = `Error: ${error.message}`;
-            adminStatusMessage.className = 'admin-status-message error';
-            checkbox.checked = !newStatus; // Revert checkbox on failure
-        })
-        .finally(() => {
-            checkbox.disabled = false;
-            setTimeout(() => { adminStatusMessage.textContent = ''; adminStatusMessage.className = 'admin-status-message'; }, 5000);
-        });
-    }
-    // ===============================================================
-
     function populateDashboardWithData(data) {
-        // ... (This function is unchanged from the last correct version) ...
         const baNameDisplay = document.getElementById('baNameDisplay'), totalRegistrationValue = document.getElementById('totalRegistrationValue'), totalValidFdValue = document.getElementById('totalValidFdValue'), totalSuspendedValue = document.getElementById('totalSuspendedValue'), totalSalaryValue = document.getElementById('totalSalaryValue'), totalIncentiveValue = document.getElementById('totalIncentiveValue'), monthDisplay = document.getElementById('monthDisplay'), weekDisplay = document.getElementById('weekDisplay'), dateRangeDisplay = document.getElementById('dateRangeDisplay'), statusValue = document.getElementById('statusValue'), lastUpdateValue = document.getElementById('lastUpdateValue'), baRankingListDiv = document.getElementById('baRankingList'), resultsTableContainer = document.getElementById('resultsTableContainer');
         const commissionCard = document.getElementById('commissionCard');
         const totalCommissionValue = document.getElementById('totalCommissionValue');
 
         if (commissionCard) {
-            commissionCard.style.display = isSpecialUser ? 'flex' : 'none';
+            commissionCard.style.display = userPermissions.has('VIEW_COMMISSION') ? 'flex' : 'none';
         }
         
         if(baNameDisplay) {
@@ -427,27 +433,23 @@ document.addEventListener('DOMContentLoaded', function() {
             baNameDisplay.className = 'ba-name-display'; 
             const selectedNames = data.searchCriteria?.baNames || [];
             
-            if (selectedNames.length > 1 && isSpecialUser) {
+            if (selectedNames.length > 1 && userPermissions.has('MULTI_SELECT')) {
                 const namesContainer = document.createElement('div');
                 namesContainer.className = 'ba-name-scroll-content';
-
                 const appendNames = () => {
                     selectedNames.forEach((name) => {
                         const nameSpan = document.createElement('span');
                         nameSpan.className = 'ba-name-scroll-item';
                         nameSpan.textContent = name;
                         namesContainer.appendChild(nameSpan);
-                        
                         const separatorSpan = document.createElement('span');
                         separatorSpan.className = 'ba-name-scroll-separator';
                         separatorSpan.textContent = '|';
                         namesContainer.appendChild(separatorSpan);
                     });
                 };
-
                 appendNames(); 
                 appendNames(); 
-
                 const animationDuration = selectedNames.length * 5;
                 namesContainer.style.animationDuration = `${animationDuration}s`;
                 baNameDisplay.appendChild(namesContainer);
@@ -463,7 +465,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if(totalSalaryValue) animateValue(totalSalaryValue, 0, summary.totalSalary || 0, 700, true);
         if(totalIncentiveValue) animateValue(totalIncentiveValue, 0, summary.totalIncentives || 0, 700, true);
         
-        if (totalCommissionValue && isSpecialUser) {
+        if (totalCommissionValue && userPermissions.has('VIEW_COMMISSION')) {
             animateValue(totalCommissionValue, 0, summary.totalCommission || 0, 700);
         }
         
@@ -501,7 +503,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         resultsTableContainer.innerHTML = '';
-        if (isSpecialUser && data.resultsTable && data.resultsTable.length > 0) {
+        if (userPermissions.has('EDIT_TABLE') && data.resultsTable && data.resultsTable.length > 0) {
             tableControls.style.display = 'flex';
         } else {
             tableControls.style.display = 'none';
@@ -530,7 +532,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     td.dataset.field = fieldName;
                     const cellData = (rowData[cellIndex] === null || rowData[cellIndex] === undefined) ? '' : rowData[cellIndex];
 
-                    if (isSpecialUser && header === 'Status') {
+                    if (userPermissions.has('EDIT_TABLE') && header === 'Status') {
                         const select = document.createElement('select');
                         statusOptions.forEach(option => {
                             const optionEl = document.createElement('option');
@@ -544,7 +546,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         td.appendChild(select);
                     } else {
                         td.textContent = cellData;
-                        if (isSpecialUser && editableColumns.includes(header)) {
+                        if (userPermissions.has('EDIT_TABLE') && editableColumns.includes(header)) {
                             td.contentEditable = "true";
                             td.classList.add('editable-cell');
                         }
@@ -563,7 +565,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (saveButton) {
         saveButton.addEventListener('click', async () => {
-            // ... (This function is unchanged) ...
             saveButton.disabled = true;
             saveStatusMessage.textContent = 'Saving...';
             saveStatusMessage.className = 'saving';
@@ -572,6 +573,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const tableRows = document.querySelectorAll('#resultsTableContainer tbody tr');
 
             tableRows.forEach(row => {
+                const statusElement = row.querySelector('[data-field="status"]');
                 const rowData = {
                     palcode: row.dataset.palcode,
                     month: row.querySelector('[data-field="month"]').textContent,
@@ -584,7 +586,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     ggr_per_fd: row.querySelector('[data-field="ggr_per_fd"]').textContent,
                     total_ggr: row.querySelector('[data-field="total_ggr"]').textContent,
                     salary: row.querySelector('[data-field="salary"]').textContent,
-                    status: row.querySelector('[data-field="status"] select').value
+                    status: statusElement.querySelector('select') ? statusElement.querySelector('select').value : statusElement.textContent
                 };
                 dataToSave.push(rowData);
             });
@@ -617,7 +619,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function animateValue(element, start, end, duration, isCurrency = false) {
-        // ... (This function is unchanged) ...
         if (!element || typeof end !== 'number' || isNaN(end)) {
              if(element && isCurrency) element.textContent = `₱ 0.00`;
              else if(element) element.textContent = `0`;

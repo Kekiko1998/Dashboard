@@ -22,8 +22,13 @@ LOGS_SHEET_NAME = 'Web App Logs'
 USERS_SHEET_NAME = 'Users'
 # Root admins have hardcoded admin rights and cannot be changed via the UI.
 ADMIN_USER_EMAILS = ['harrypobreza@gmail.com'] 
-# Initial list of users with special access. Admins can grant this to others.
-SPECIAL_USER_EMAILS = ['official.tutansradio@gmail.com'] 
+# Define all controllable features here
+ALL_PERMISSIONS = {
+    'MULTI_SELECT',
+    'SEARCH_ALL',
+    'EDIT_TABLE',
+    'VIEW_COMMISSION'
+}
 # =========================================================================
 YOUR_TIMEZONE = 'Asia/Manila'
 
@@ -37,14 +42,14 @@ login_manager.init_app(app)
 login_manager.login_view = "login"
 
 class User(UserMixin):
-    def __init__(self, id, name, email, is_special=False, is_admin=False):
+    def __init__(self, id, name, email, is_admin=False, permissions=None):
         self.id = id
         self.name = name
         self.email = email
-        self.is_special = is_special
         self.is_admin = is_admin
+        # If user is admin, they get all permissions. Otherwise, use the permissions passed.
+        self.permissions = ALL_PERMISSIONS if is_admin else (permissions or set())
 
-# This now acts as a session cache, not the primary user store
 users = {} 
 @login_manager.user_loader
 def load_user(user_id):
@@ -144,21 +149,23 @@ def callback():
     user_map = {row[1].lower(): row for row in user_data[1:] if len(row) > 1}
 
     is_admin = user_email in [email.lower() for email in ADMIN_USER_EMAILS]
+    
+    permissions = set()
 
     if user_email in user_map:
         sheet_row = user_map[user_email]
-        is_special = (sheet_row[3].upper() == 'TRUE' if len(sheet_row) > 3 else False) or is_admin
-        user = User(id=user_id, name=user_name, email=user_email, is_special=is_special, is_admin=is_admin)
+        if len(sheet_row) > 4 and sheet_row[4]:
+            permissions = set(p.strip() for p in sheet_row[4].split(','))
     else:
-        is_special = is_admin or user_email in [email.lower() for email in SPECIAL_USER_EMAILS]
-        new_row = [user_id, user_email, user_name, str(is_special).upper(), str(is_admin).upper()]
+        new_row = [user_id, user_email, user_name, str(is_admin).upper(), ""]
         sheet_api.values().append(
             spreadsheetId=DATABASE_SHEET_ID,
             range=f"{USERS_SHEET_NAME}!A1",
             valueInputOption='USER_ENTERED',
             body={'values': [new_row]}
         ).execute()
-        user = User(id=user_id, name=user_name, email=user_email, is_special=is_special, is_admin=is_admin)
+
+    user = User(id=user_id, name=user_name, email=user_email, is_admin=is_admin, permissions=permissions)
 
     users[user_id] = user
     login_user(user)
@@ -171,15 +178,14 @@ def logout():
     return redirect(url_for('login'))
 
 # --- API Routes ---
-
 @app.route('/api/user-info', methods=['GET'])
 @login_required
 def get_user_info():
     return jsonify({
         "email": current_user.email,
         "name": current_user.name,
-        "isSpecial": current_user.is_special,
-        "isAdmin": current_user.is_admin
+        "isAdmin": current_user.is_admin,
+        "permissions": list(current_user.permissions)
     })
 
 @app.route('/api/users', methods=['GET'])
@@ -194,13 +200,16 @@ def get_all_users():
     
     users_list = []
     for row in user_data[1:]:
-        if len(row) > 2:
-            users_list.append({
+        if len(row) > 0: # Check if row is not empty
+             is_admin_flag = row[2].upper() == 'TRUE' if len(row) > 2 else False
+             permissions_str = row[3] if len(row) > 3 else ""
+             users_list.append({
                 "email": row[0],
-                "name": row[1],
-                "is_special": row[2].upper() == 'TRUE'
+                "name": row[1] if len(row) > 1 else "N/A",
+                "is_admin": is_admin_flag,
+                "permissions": [p.strip() for p in permissions_str.split(',') if p]
             })
-    return jsonify(users_list)
+    return jsonify({"users": users_list, "all_permissions": list(ALL_PERMISSIONS)})
 
 @app.route('/api/update_user_permission', methods=['POST'])
 @login_required
@@ -210,33 +219,35 @@ def update_user_permission():
 
     data = request.get_json()
     target_email = data.get('email', '').lower()
-    new_status = data.get('is_special', False)
+    new_permissions = data.get('permissions', [])
 
     if not target_email:
         return jsonify({"success": False, "error": "No email provided"}), 400
     
-    if target_email in [email.lower() for email in ADMIN_USER_EMAILS]:
-        return jsonify({"success": False, "error": "Cannot change permissions for a root admin"}), 400
-
     user_data = get_sheet_data(DATABASE_SHEET_ID, f"{USERS_SHEET_NAME}!A:E")
     if not user_data:
         return jsonify({"success": False, "error": "Could not read Users sheet"}), 500
     
     row_index_to_update = -1
+    is_target_root_admin = False
     for i, row in enumerate(user_data):
         if len(row) > 1 and row[1].lower() == target_email:
             row_index_to_update = i + 1
+            if row[1].lower() in [email.lower() for email in ADMIN_USER_EMAILS]:
+                is_target_root_admin = True
             break
     
-    if row_index_to_update == -1:
-        return jsonify({"success": False, "error": "User not found"}), 404
+    if row_index_to_update == -1: return jsonify({"success": False, "error": "User not found"}), 404
+    if is_target_root_admin: return jsonify({"success": False, "error": "Cannot change permissions for a root admin"}), 400
 
-    range_to_update = f"{USERS_SHEET_NAME}!D{row_index_to_update}"
+    permissions_string = ",".join(sorted(new_permissions))
+    
+    range_to_update = f"{USERS_SHEET_NAME}!E{row_index_to_update}"
     sheet_api.values().update(
         spreadsheetId=DATABASE_SHEET_ID,
         range=range_to_update,
         valueInputOption='RAW',
-        body={'values': [[str(new_status).upper()]]}
+        body={'values': [[permissions_string]]}
     ).execute()
 
     return jsonify({"success": True, "message": f"Permissions for {target_email} updated."})
@@ -254,10 +265,10 @@ def get_unique_ba_names():
 def search_dashboard_data():
     req_data = request.get_json()
     month, week, ba_names, palcode = req_data.get('month'), req_data.get('week'), req_data.get('baNames', []), req_data.get('palcode', '')
-    is_special_user = current_user.is_special
     
     if not month or not week: return jsonify({"error": "Month and Week are required."}), 400
-    if not is_special_user and not ba_names: return jsonify({"error": "BA Name is required."}), 400
+    if not ba_names and 'SEARCH_ALL' not in current_user.permissions:
+        return jsonify({"error": "BA Name is required."}), 400
     
     all_sheet_data = get_sheet_data(DATABASE_SHEET_ID, f"{DATABASE_SHEET_NAME}!A:L")
     if all_sheet_data is None: return jsonify({"error": "Database sheet not found or API failed."}), 500
@@ -271,7 +282,7 @@ def search_dashboard_data():
     
     period_data_rows = [row for row in all_sheet_data[1:] if len(row) > WEEK and row[MONTH].strip().lower() == search_month and row[WEEK].strip().lower() == search_week]
     
-    ba_display_name = "ALL BAs" if is_special_user and not search_ba_names_lower else (f"MULTIPLE BAs ({len(search_ba_names_lower)})" if len(search_ba_names_lower) > 1 else (ba_names[0].strip().upper() if search_ba_names_lower else "N/A"))
+    ba_display_name = "ALL BAs" if 'SEARCH_ALL' in current_user.permissions and not search_ba_names_lower else (f"MULTIPLE BAs ({len(search_ba_names_lower)})" if len(search_ba_names_lower) > 1 else (ba_names[0].strip().upper() if search_ba_names_lower else "N/A"))
     search_criteria_frontend = {'baNames': [name.strip().upper() for name in ba_names]}
     date_range_display = calculate_date_range(month, week)
     
@@ -317,7 +328,7 @@ def search_dashboard_data():
             summary_for_display['totalValidFd'] += to_float(row[VALID_FD]) if len(row) > VALID_FD else 0
             summary_for_display['totalSuspended'] += to_float(row[SUSPENDED_FD]) if len(row) > SUSPENDED_FD else 0
             summary_for_display['totalSalary'] += to_float(row[SALARY]) if len(row) > SALARY else 0
-            if is_special_user:
+            if 'VIEW_COMMISSION' in current_user.permissions:
                 current_fd = to_float(row[VALID_FD]) if len(row) > VALID_FD else 0
                 current_rate = to_float(row[RATE]) if len(row) > RATE else 0
                 commission_multiplier = commission_map.get(current_rate, 0)
@@ -325,14 +336,14 @@ def search_dashboard_data():
         except IndexError as e: logging.warning(f"Skipping row due to missing columns: {row} -> {e}")
     if overall_total_valid_fd >= 6000:
         if search_ba_names_lower: summary_for_display['totalIncentives'] = sum(ba_incentives_map.get(name.upper(), 0) for name in ba_names)
-        elif is_special_user: summary_for_display['totalIncentives'] = sum_of_all_individual_incentives
+        elif 'SEARCH_ALL' in current_user.permissions: summary_for_display['totalIncentives'] = sum_of_all_individual_incentives
     
     return jsonify({ "baNameDisplay": ba_display_name, "searchCriteria": search_criteria_frontend, "summary": summary_for_display, "monthDisplay": search_month.upper(), "weekDisplay": search_week.upper(), "dateRangeDisplay": date_range_display, "status": "Active", "resultsTable": results_for_table, "rankedBaList": final_ranked_ba_list, "lastUpdate": last_update_timestamp })
 
 @app.route('/api/save_dashboard', methods=['POST'])
 @login_required
 def save_dashboard():
-    if not current_user.is_special:
+    if 'EDIT_TABLE' not in current_user.permissions:
         return jsonify({"success": False, "error": "Unauthorized"}), 403
     updated_rows_from_client = request.get_json()
     if not updated_rows_from_client:
