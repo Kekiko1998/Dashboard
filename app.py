@@ -26,7 +26,7 @@ YOUR_TIMEZONE = 'Asia/Manila'
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
-# (The rest of your authentication and helper functions remain the same)
+# (Authentication and most helper functions remain the same)
 # ...
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -64,7 +64,6 @@ def to_float(value):
 def get_all_sheet_data(sheet_id, sheet_name):
     if not sheet_api: return None
     try:
-        # Fetch the entire sheet data
         result = sheet_api.values().get(spreadsheetId=sheet_id, range=f"{sheet_name}!A:L").execute()
         return result.get('values', [])
     except Exception as e:
@@ -145,38 +144,29 @@ def get_unique_ba_names():
 @app.route('/api/search', methods=['POST'])
 @login_required
 def search_dashboard_data():
+    # ... This entire function is correct and unchanged from the last version ...
     req_data = request.get_json()
     month, week, ba_names, palcode = req_data.get('month'), req_data.get('week'), req_data.get('baNames', []), req_data.get('palcode', '')
     is_special_user = current_user.is_special
-    
     if not month or not week: return jsonify({"error": "Month and Week are required."}), 400
     if not is_special_user and not ba_names: return jsonify({"error": "BA Name is required."}), 400
-    
     all_sheet_data = get_all_sheet_data(DATABASE_SHEET_ID, DATABASE_SHEET_NAME)
     if all_sheet_data is None: return jsonify({"error": "Database sheet not found or API failed."}), 500
-        
     log_user_event('searchDashboardData', req_data)
     search_month, search_week = month.strip().lower(), week.strip().lower()
     search_ba_names_lower = [str(name).strip().lower() for name in ba_names if name]
     search_palcode_lower = palcode.strip().lower() if palcode else ""
-    
-    # Column indices
     PALCODE, MONTH, WEEK, BA_NAME, REG, VALID_FD, SUSPENDED_FD, RATE, GGR_PER_FD, TOTAL_GGR, SALARY, STATUS = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
-    
     period_data_rows = [row for row in all_sheet_data[1:] if len(row) > WEEK and row[MONTH].strip().lower() == search_month and row[WEEK].strip().lower() == search_week]
-    
     ba_display_name = "ALL BAs" if is_special_user and not search_ba_names_lower else (f"MULTIPLE BAs ({len(search_ba_names_lower)})" if len(search_ba_names_lower) > 1 else (ba_names[0].strip().upper() if search_ba_names_lower else "N/A"))
     search_criteria_frontend = {'baNames': [name.strip().upper() for name in ba_names]}
     date_range_display = calculate_date_range(month, week)
-    
     utc_now = datetime.now(pytz.utc)
     local_tz = pytz.timezone(YOUR_TIMEZONE)
     local_now = utc_now.astimezone(local_tz)
     last_update_timestamp = local_now.strftime('%A, %B %d, %Y, %I:%M:%S %p')
-
     if not period_data_rows:
         return jsonify({ "baNameDisplay": ba_display_name, "searchCriteria": search_criteria_frontend, "summary": {"totalRegistration": 0, "totalValidFd": 0, "totalSuspended": 0, "totalSalary": 0, "totalIncentives": 0, "totalCommission": 0}, "monthDisplay": search_month.upper(), "weekDisplay": search_week.upper(), "dateRangeDisplay": date_range_display, "status": "N/A", "resultsTable": [], "rankedBaList": [], "lastUpdate": last_update_timestamp, "message": "No records for selected period." })
-
     overall_total_valid_fd, ba_period_fds = 0, {}
     for row in period_data_rows:
         try:
@@ -185,7 +175,6 @@ def search_dashboard_data():
             if ba_name not in ba_period_fds: ba_period_fds[ba_name] = {"originalName": ba_name, "totalFd": 0}
             ba_period_fds[ba_name]["totalFd"] += current_fd
         except (ValueError, IndexError): continue
-    
     final_ranked_ba_list = sorted(ba_period_fds.values(), key=lambda x: x['totalFd'], reverse=True)
     ba_incentives_map, sum_of_all_individual_incentives = {}, 0
     if overall_total_valid_fd >= 6000:
@@ -199,23 +188,9 @@ def search_dashboard_data():
             if incentive > 0:
                 ba_incentives_map[ba['originalName'].upper()] = incentive
                 sum_of_all_individual_incentives += incentive
-    
     filtered_rows = [row for row in period_data_rows if ((not search_ba_names_lower or (len(row) > BA_NAME and row[BA_NAME].strip().lower() in search_ba_names_lower)) and (not search_palcode_lower or (len(row) > PALCODE and row[PALCODE].strip().lower() == search_palcode_lower)))]
-    
-    # ========================== NEW COMMISSION LOGIC ==========================
-    # Define the mapping from FD Rate to Commission Value
-    commission_map = {
-        25.00: 5,
-        60.00: 10,
-        90.00: 10,
-        140.00: 10,
-        230.00: 20,
-        325.00: 25,
-        420.00: 30
-    }
-    
+    commission_map = { 25.00: 5, 60.00: 10, 90.00: 10, 140.00: 10, 230.00: 20, 325.00: 25, 420.00: 30 }
     results_for_table, summary_for_display = [], {"totalRegistration": 0, "totalValidFd": 0, "totalSuspended": 0, "totalSalary": 0, "totalIncentives": 0, "totalCommission": 0}
-    
     for row in filtered_rows:
         try:
             results_for_table.append(row)
@@ -223,78 +198,53 @@ def search_dashboard_data():
             summary_for_display['totalValidFd'] += to_float(row[VALID_FD]) if len(row) > VALID_FD else 0
             summary_for_display['totalSuspended'] += to_float(row[SUSPENDED_FD]) if len(row) > SUSPENDED_FD else 0
             summary_for_display['totalSalary'] += to_float(row[SALARY]) if len(row) > SALARY else 0
-            
-            # Calculate commission for this row and add to total if user is special
             if is_special_user:
                 current_fd = to_float(row[VALID_FD]) if len(row) > VALID_FD else 0
                 current_rate = to_float(row[RATE]) if len(row) > RATE else 0
-                commission_multiplier = commission_map.get(current_rate, 0) # Get multiplier, default to 0 if not found
+                commission_multiplier = commission_map.get(current_rate, 0)
                 summary_for_display['totalCommission'] += (current_fd * commission_multiplier)
-                
         except IndexError as e: logging.warning(f"Skipping row due to missing columns: {row} -> {e}")
-    # ========================================================================
-    
     if overall_total_valid_fd >= 6000:
         if search_ba_names_lower: summary_for_display['totalIncentives'] = sum(ba_incentives_map.get(name.upper(), 0) for name in ba_names)
         elif is_special_user: summary_for_display['totalIncentives'] = sum_of_all_individual_incentives
-    
     return jsonify({ "baNameDisplay": ba_display_name, "searchCriteria": search_criteria_frontend, "summary": summary_for_display, "monthDisplay": search_month.upper(), "weekDisplay": search_week.upper(), "dateRangeDisplay": date_range_display, "status": "Active", "resultsTable": results_for_table, "rankedBaList": final_ranked_ba_list, "lastUpdate": last_update_timestamp })
 
-
-# ======================= REWRITTEN ROUTE TO SAVE DATA EFFICIENTLY =======================
 @app.route('/api/save_dashboard', methods=['POST'])
 @login_required
 def save_dashboard():
-    # Security: Only special users can save data
+    # ... This entire function is correct and unchanged from the last version ...
     if not current_user.is_special:
         return jsonify({"success": False, "error": "Unauthorized"}), 403
-
     updated_rows_from_client = request.get_json()
     if not updated_rows_from_client:
         return jsonify({"success": False, "error": "No data received"}), 400
-
     try:
-        # 1. Fetch the entire current sheet data to get the real row numbers and original values
         all_sheet_data = get_all_sheet_data(DATABASE_SHEET_ID, DATABASE_SHEET_NAME)
         if not all_sheet_data:
             return jsonify({"success": False, "error": "Could not fetch current database state."}), 500
-
-        # Create a map of PALCODE -> {row_data, original_row_index}
         palcode_map = {row[0]: {'data': row, 'index': i + 1} for i, row in enumerate(all_sheet_data) if row}
-
-        # 2. Compare and build a list of cell-specific updates
         update_requests = []
-        # Map field names from JS to their column index and letter
-        # IMPORTANT: 'rate', 'ggr_per_fd', and 'salary' are intentionally omitted to make them read-only
         editable_cols = {
             'month': {'idx': 1, 'col': 'B'}, 'week': {'idx': 2, 'col': 'C'}, 'ba_name': {'idx': 3, 'col': 'D'},
             'reg': {'idx': 4, 'col': 'E'}, 'valid_fd': {'idx': 5, 'col': 'F'}, 'suspended_fd': {'idx': 6, 'col': 'G'},
             'total_ggr': {'idx': 9, 'col': 'J'}, 'status': {'idx': 11, 'col': 'L'}
         }
-        
         for client_row in updated_rows_from_client:
             palcode = client_row.get('palcode')
             if palcode in palcode_map:
                 original_row = palcode_map[palcode]['data']
                 original_index = palcode_map[palcode]['index']
-
                 for field, col_info in editable_cols.items():
                     col_idx = col_info['idx']
-                    # Ensure original row has this column before comparing
                     original_value = original_row[col_idx] if len(original_row) > col_idx else ""
                     client_value = client_row.get(field, "")
-
-                    # Compare values as strings to handle different data types consistently
                     if str(original_value).strip() != str(client_value).strip():
                         update_requests.append({
                             "range": f"'{DATABASE_SHEET_NAME}'!{col_info['col']}{original_index}",
                             "values": [[client_value]]
                         })
-
-        # 3. If there are changes, execute the batch update
         if not update_requests:
             return jsonify({"success": True, "message": "No changes detected to save."})
-
         batch_update_body = {
             'valueInputOption': 'USER_ENTERED',
             'data': update_requests
@@ -303,20 +253,46 @@ def save_dashboard():
             spreadsheetId=DATABASE_SHEET_ID,
             body=batch_update_body
         ).execute()
-
-        # 4. Log the successful update event
         log_user_event('saveDashboardData', {'updated_palcodes': [r['palcode'] for r in updated_rows_from_client]})
-        
         return jsonify({"success": True, "message": f"Successfully updated {len(update_requests)} cells."})
-
     except Exception as e:
         logging.error(f"Error saving dashboard data: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
-# =========================================================================================
+
+# ======================== LOGGING FUNCTION UPDATED ========================
+
+# Helper to cache sheet IDs to avoid repeated API calls
+SHEET_ID_CACHE = {}
+def _get_sheet_id_by_name(spreadsheet_id, sheet_name):
+    """Gets the numeric ID of a sheet by its name, using a cache."""
+    if spreadsheet_id in SHEET_ID_CACHE and sheet_name in SHEET_ID_CACHE[spreadsheet_id]:
+        return SHEET_ID_CACHE[spreadsheet_id][sheet_name]
+
+    try:
+        spreadsheet_metadata = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+        for sheet in spreadsheet_metadata.get('sheets', []):
+            props = sheet.get('properties', {})
+            if props.get('title') == sheet_name:
+                sheet_id = props.get('sheetId')
+                if spreadsheet_id not in SHEET_ID_CACHE:
+                    SHEET_ID_CACHE[spreadsheet_id] = {}
+                SHEET_ID_CACHE[spreadsheet_id][sheet_name] = sheet_id
+                return sheet_id
+        return None
+    except Exception as e:
+        logging.error(f"Could not get sheet ID for '{sheet_name}': {e}")
+        return None
 
 def log_user_event(function_name, inputs):
     if not sheet_api: return
     try:
+        # Get the numeric sheetId required for batch updates
+        logs_sheet_id = _get_sheet_id_by_name(LOGS_SHEET_ID, LOGS_SHEET_NAME)
+        if logs_sheet_id is None:
+            logging.error(f"Could not find sheet named '{LOGS_SHEET_NAME}' to log event.")
+            return
+
+        # Prepare the data for the new row
         utc_now = datetime.now(pytz.utc)
         local_tz = pytz.timezone(YOUR_TIMEZONE)
         local_now = utc_now.astimezone(local_tz)
@@ -329,9 +305,51 @@ def log_user_event(function_name, inputs):
             ba_names_str = ', '.join(inputs.get('baNames', [])) if inputs.get('baNames') else "N/A"
             formatted_inputs = f"Month - {inputs.get('month', 'N/A')}, Week - {inputs.get('week', 'N/A').replace('week ', '')}, Ba Name(s) - {ba_names_str}, Palcode - {inputs.get('palcode', 'N/A') or 'N/A'}"
         
-        row_to_append = [timestamp, user_email, function_name, formatted_inputs]
-        sheet_api.values().append(spreadsheetId=LOGS_SHEET_ID, range=f'{LOGS_SHEET_NAME}!A1', valueInputOption='USER_ENTERED', body={'values': [row_to_append]}).execute()
-    except Exception as e: logging.error(f"Error logging event: {e}")
+        new_row_data = [timestamp, user_email, function_name, formatted_inputs]
+
+        # Prepare the batch update request to insert a row and populate it
+        requests_body = [
+            {
+                # Request 1: Insert a new blank row after the header (at row index 1)
+                "insertDimension": {
+                    "range": {
+                        "sheetId": logs_sheet_id,
+                        "dimension": "ROWS",
+                        "startIndex": 1,
+                        "endIndex": 2
+                    }
+                }
+            },
+            {
+                # Request 2: Populate the new row with data
+                "updateCells": {
+                    "rows": [
+                        {
+                            "values": [
+                                {"userEnteredValue": {"stringValue": str(cell)}} for cell in new_row_data
+                            ]
+                        }
+                    ],
+                    "fields": "userEnteredValue",
+                    "start": {
+                        "sheetId": logs_sheet_id,
+                        "rowIndex": 1,
+                        "columnIndex": 0
+                    }
+                }
+            }
+        ]
+
+        # Execute the single batch update API call
+        sheet_api.batchUpdate(
+            spreadsheetId=LOGS_SHEET_ID,
+            body={'requests': requests_body}
+        ).execute()
+
+    except Exception as e:
+        logging.error(f"Error logging event by inserting row: {e}")
+# =======================================================================
+
 
 if __name__ == '__main__':
     os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
