@@ -145,7 +145,6 @@ def get_unique_ba_names():
 @app.route('/api/search', methods=['POST'])
 @login_required
 def search_dashboard_data():
-    # This route remains the same as your previous version
     req_data = request.get_json()
     month, week, ba_names, palcode = req_data.get('month'), req_data.get('week'), req_data.get('baNames', []), req_data.get('palcode', '')
     is_special_user = current_user.is_special
@@ -176,7 +175,7 @@ def search_dashboard_data():
     last_update_timestamp = local_now.strftime('%A, %B %d, %Y, %I:%M:%S %p')
 
     if not period_data_rows:
-        return jsonify({ "baNameDisplay": ba_display_name, "searchCriteria": search_criteria_frontend, "summary": {"totalRegistration": 0, "totalValidFd": 0, "totalSuspended": 0, "totalSalary": 0, "totalIncentives": 0}, "monthDisplay": search_month.upper(), "weekDisplay": search_week.upper(), "dateRangeDisplay": date_range_display, "status": "N/A", "resultsTable": [], "rankedBaList": [], "lastUpdate": last_update_timestamp, "message": "No records for selected period." })
+        return jsonify({ "baNameDisplay": ba_display_name, "searchCriteria": search_criteria_frontend, "summary": {"totalRegistration": 0, "totalValidFd": 0, "totalSuspended": 0, "totalSalary": 0, "totalIncentives": 0, "totalCommission": 0}, "monthDisplay": search_month.upper(), "weekDisplay": search_week.upper(), "dateRangeDisplay": date_range_display, "status": "N/A", "resultsTable": [], "rankedBaList": [], "lastUpdate": last_update_timestamp, "message": "No records for selected period." })
 
     overall_total_valid_fd, ba_period_fds = 0, {}
     for row in period_data_rows:
@@ -203,7 +202,19 @@ def search_dashboard_data():
     
     filtered_rows = [row for row in period_data_rows if ((not search_ba_names_lower or (len(row) > BA_NAME and row[BA_NAME].strip().lower() in search_ba_names_lower)) and (not search_palcode_lower or (len(row) > PALCODE and row[PALCODE].strip().lower() == search_palcode_lower)))]
     
-    results_for_table, summary_for_display = [], {"totalRegistration": 0, "totalValidFd": 0, "totalSuspended": 0, "totalSalary": 0, "totalIncentives": 0}
+    # ========================== NEW COMMISSION LOGIC ==========================
+    # Define the mapping from FD Rate to Commission Value
+    commission_map = {
+        25.00: 5,
+        60.00: 10,
+        90.00: 10,
+        140.00: 10,
+        230.00: 20,
+        325.00: 25,
+        420.00: 30
+    }
+    
+    results_for_table, summary_for_display = [], {"totalRegistration": 0, "totalValidFd": 0, "totalSuspended": 0, "totalSalary": 0, "totalIncentives": 0, "totalCommission": 0}
     
     for row in filtered_rows:
         try:
@@ -212,7 +223,16 @@ def search_dashboard_data():
             summary_for_display['totalValidFd'] += to_float(row[VALID_FD]) if len(row) > VALID_FD else 0
             summary_for_display['totalSuspended'] += to_float(row[SUSPENDED_FD]) if len(row) > SUSPENDED_FD else 0
             summary_for_display['totalSalary'] += to_float(row[SALARY]) if len(row) > SALARY else 0
+            
+            # Calculate commission for this row and add to total if user is special
+            if is_special_user:
+                current_fd = to_float(row[VALID_FD]) if len(row) > VALID_FD else 0
+                current_rate = to_float(row[RATE]) if len(row) > RATE else 0
+                commission_multiplier = commission_map.get(current_rate, 0) # Get multiplier, default to 0 if not found
+                summary_for_display['totalCommission'] += (current_fd * commission_multiplier)
+                
         except IndexError as e: logging.warning(f"Skipping row due to missing columns: {row} -> {e}")
+    # ========================================================================
     
     if overall_total_valid_fd >= 6000:
         if search_ba_names_lower: summary_for_display['totalIncentives'] = sum(ba_incentives_map.get(name.upper(), 0) for name in ba_names)
