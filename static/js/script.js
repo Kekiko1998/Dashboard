@@ -152,27 +152,16 @@ document.addEventListener('DOMContentLoaded', function() {
     window.showTab = function(tabId, clickedButton) {
         document.querySelectorAll(".tab-content").forEach(tab => tab.classList.remove('active-content'));
         document.querySelectorAll(".tab-button").forEach(btn => btn.classList.remove("active"));
+        
         document.getElementById(tabId).classList.add('active-content');
         clickedButton.classList.add("active");
 
-        const hasMultiSelectPerms = userPermissions.has('MULTI_SELECT') || userPermissions.has('SEARCH_ALL');
-
-        if (tabId === 'homeArea') {
-            homeContentCentered.appendChild(homeTitleContainer);
-            homeContentCentered.appendChild(homeSearchControlsContainer);
-            if (hasMultiSelectPerms) {
-                baNameSelectContainer.style.display = 'block';
-                baNameInput.style.display = 'none';
-            } else {
-                baNameSelectContainer.style.display = 'none';
-                baNameInput.style.display = 'block';
-            }
-        } else {
+        if (tabId !== 'homeArea') {
             topLeftDynamicContent.appendChild(homeTitleContainer);
             topLeftDynamicContent.appendChild(homeSearchControlsContainer);
-            // Hide BA selection controls when not on home tab for a cleaner look
-            baNameSelectContainer.style.display = 'none';
-            baNameInput.style.display = 'none';
+        } else {
+            homeContentCentered.appendChild(homeTitleContainer);
+            homeContentCentered.appendChild(homeSearchControlsContainer);
         }
 
         if (tabId === 'adminArea' && isAdmin) {
@@ -198,7 +187,7 @@ document.addEventListener('DOMContentLoaded', function() {
     handleMonthChange();
 
     if (searchButton) { searchButton.addEventListener('click', performSearch); }
-
+    
     // --- Admin Panel Functions ---
     function loadUserManagementPanel() {
         userManagementTableContainer.innerHTML = '<div class="loading-indicator">⏳ Loading users...</div>';
@@ -213,7 +202,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 userManagementTableContainer.innerHTML = `<p class="error-message-main">❌ ${error.message}</p>`;
             });
     }
-
     function buildUserTable(users, allPermissions) {
         userManagementTableContainer.innerHTML = '';
         const table = document.createElement('table');
@@ -248,7 +236,6 @@ document.addEventListener('DOMContentLoaded', function() {
             button.addEventListener('click', handlePermissionSave);
         });
     }
-
     function handlePermissionSave(event) {
         const button = event.target;
         const row = button.closest('tr');
