@@ -19,12 +19,20 @@ document.addEventListener('DOMContentLoaded', function() {
     const dashboardSearchError = document.getElementById('dashboardSearchError');
     const darkModeToggleButton = document.getElementById('darkModeToggle');
     const baNameSuggestions = document.getElementById('baNameSuggestions');
+    // ================== NEW ADMIN ELEMENTS ==================
+    const adminTabBtn = document.getElementById('adminTabBtn');
+    const userManagementTableContainer = document.getElementById('userManagementTableContainer');
+    const adminStatusMessage = document.getElementById('adminStatusMessage');
+    // ======================================================
     // --- ELEMENTS FOR EDITING ---
     const tableControls = document.getElementById('tableControls');
     const saveButton = document.getElementById('saveButton');
     const saveStatusMessage = document.getElementById('saveStatusMessage');
 
+    // ================== NEW STATE VARIABLES ==================
+    let isAdmin = false;
     let isSpecialUser = false;
+    // =======================================================
     let selectedBaNamesState = [];
     const statusOptions = ['PAID', 'DELAYED', 'UPDATING', 'INVALID', 'UNOFFICIAL'];
 
@@ -118,15 +126,24 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // --- Initial Data Fetching ---
+    // ================== UPDATED USER SETUP FUNCTION ==================
     function setupUIForUser(userInfo) {
         isSpecialUser = userInfo.isSpecial;
+        isAdmin = userInfo.isAdmin; // Store admin status
         userNameSpan.textContent = userInfo.name;
         userInfoDiv.style.display = 'flex';
+
+        // Show Admin tab if user is an admin
+        if (isAdmin && adminTabBtn) {
+            adminTabBtn.style.display = 'block';
+        }
+
         const activeTabButton = document.querySelector('.tab-button.active');
         if (isSpecialUser && activeTabButton && activeTabButton.id === 'homeTabBtn') {
             switchToMultiSelectView();
         }
     }
+    // =================================================================
     fetch('/api/user-info').then(response => {
         if (response.status === 401) { window.location.href = '/login'; return Promise.reject('User not logged in'); }
         if (!response.ok) { throw new Error('Network response was not ok'); }
@@ -170,6 +187,7 @@ document.addEventListener('DOMContentLoaded', function() {
         setDarkMode(true);
     }
 
+    // ================== UPDATED showTab FUNCTION ==================
     window.showTab = function(tabId, clickedButton) {
         document.querySelectorAll(".tab-content").forEach(tab => tab.classList.remove('active-content'));
         document.querySelectorAll(".tab-button").forEach(btn => btn.classList.remove("active"));
@@ -182,7 +200,13 @@ document.addEventListener('DOMContentLoaded', function() {
             topLeftDynamicContent.appendChild(homeTitleContainer); topLeftDynamicContent.appendChild(homeSearchControlsContainer);
             if (isSpecialUser) switchToSimpleView();
         }
+
+        // If admin tab is clicked, load the user panel
+        if (tabId === 'adminArea' && isAdmin) {
+            loadUserManagementPanel();
+        }
     };
+    // ===============================================================
 
     function handleMonthChange() {
         const selectedMonth = monthSelect.value;
@@ -205,8 +229,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (searchButton) { searchButton.addEventListener('click', performSearch); }
 
     // --- Search & Data Handling ---
+    // ... (This section is unchanged) ...
     function performSearch() {
-        // ... (This function is unchanged) ...
         const month = monthSelect.value, week = weekSelect.value, palcode = palcodeInput.value.trim();
         let baNamesToSearch;
         const baNameInputValue = document.getElementById('baNameInput').value.trim();
@@ -242,7 +266,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function handleSearchSuccess(data) {
-        // ... (This function is unchanged) ...
         searchButton.disabled = false; searchButton.textContent = 'SEARCH'; loadingIndicator.style.display = 'none';
         if (data.error || (!data.resultsTable && !data.summary)) {
             dashboardSearchError.querySelector('p').textContent = `⚠️ ${data.error || 'An unknown error occurred.'}`;
@@ -258,7 +281,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     function handleSearchFailure(error) {
-        // ... (This function is unchanged) ...
         if (error.message.includes('Session expired')) { console.log("Session expired, redirecting..."); return; }
         searchButton.disabled = false; searchButton.textContent = 'SEARCH'; loadingIndicator.style.display = 'none';
         dashboardSearchError.querySelector('p').textContent = `❌ Script Error: ${error.message || 'Unknown error.'}`;
@@ -267,7 +289,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function determineSummaryStatus(tableData) {
-        // ... (This function is unchanged) ...
         const statusColumnIndex = 11;
         if (!tableData || tableData.length === 0) return { text: 'N/A', class: '' };
         const statuses = new Set(tableData.map(row => row[statusColumnIndex]?.toString().trim().toLowerCase()).filter(Boolean));
@@ -286,7 +307,113 @@ document.addEventListener('DOMContentLoaded', function() {
         return { text: 'MIXED', class: '' };
     }
     
+    // ================== NEW ADMIN PANEL FUNCTIONS ==================
+    function loadUserManagementPanel() {
+        userManagementTableContainer.innerHTML = '<div class="loading-indicator">⏳ Loading users...</div>';
+        adminStatusMessage.textContent = '';
+        
+        fetch('/api/users')
+            .then(res => {
+                if (!res.ok) throw new Error('Failed to fetch users.');
+                return res.json();
+            })
+            .then(users => {
+                buildUserTable(users);
+            })
+            .catch(error => {
+                userManagementTableContainer.innerHTML = `<p class="error-message-main">❌ ${error.message}</p>`;
+            });
+    }
+
+    function buildUserTable(users) {
+        userManagementTableContainer.innerHTML = '';
+        const table = document.createElement('table');
+        table.id = 'userManagementTable';
+        table.innerHTML = `
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Special Access</th>
+                </tr>
+            </thead>
+        `;
+        const tbody = document.createElement('tbody');
+        
+        users.forEach(user => {
+            const tr = document.createElement('tr');
+            
+            const tdName = document.createElement('td');
+            tdName.textContent = user.name;
+            tr.appendChild(tdName);
+
+            const tdEmail = document.createElement('td');
+            tdEmail.textContent = user.email;
+            tr.appendChild(tdEmail);
+
+            const tdPermission = document.createElement('td');
+            const switchLabel = document.createElement('label');
+            switchLabel.className = 'switch';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = user.is_special;
+            checkbox.dataset.email = user.email; // Store email for the API call
+
+            checkbox.addEventListener('change', handlePermissionChange);
+
+            const slider = document.createElement('span');
+            slider.className = 'slider round';
+
+            switchLabel.appendChild(checkbox);
+            switchLabel.appendChild(slider);
+            tdPermission.appendChild(switchLabel);
+            tr.appendChild(tdPermission);
+
+            tbody.appendChild(tr);
+        });
+
+        table.appendChild(tbody);
+        userManagementTableContainer.appendChild(table);
+    }
+
+    function handlePermissionChange(event) {
+        const checkbox = event.target;
+        const email = checkbox.dataset.email;
+        const newStatus = checkbox.checked;
+
+        checkbox.disabled = true; // Prevent multiple clicks
+        adminStatusMessage.textContent = 'Updating...';
+        adminStatusMessage.className = 'admin-status-message saving';
+
+        fetch('/api/update_user_permission', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ email: email, is_special: newStatus })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                adminStatusMessage.textContent = data.message;
+                adminStatusMessage.className = 'admin-status-message success';
+            } else {
+                throw new Error(data.error);
+            }
+        })
+        .catch(error => {
+            adminStatusMessage.textContent = `Error: ${error.message}`;
+            adminStatusMessage.className = 'admin-status-message error';
+            checkbox.checked = !newStatus; // Revert checkbox on failure
+        })
+        .finally(() => {
+            checkbox.disabled = false;
+            setTimeout(() => { adminStatusMessage.textContent = ''; adminStatusMessage.className = 'admin-status-message'; }, 5000);
+        });
+    }
+    // ===============================================================
+
     function populateDashboardWithData(data) {
+        // ... (This function is unchanged from the last correct version) ...
         const baNameDisplay = document.getElementById('baNameDisplay'), totalRegistrationValue = document.getElementById('totalRegistrationValue'), totalValidFdValue = document.getElementById('totalValidFdValue'), totalSuspendedValue = document.getElementById('totalSuspendedValue'), totalSalaryValue = document.getElementById('totalSalaryValue'), totalIncentiveValue = document.getElementById('totalIncentiveValue'), monthDisplay = document.getElementById('monthDisplay'), weekDisplay = document.getElementById('weekDisplay'), dateRangeDisplay = document.getElementById('dateRangeDisplay'), statusValue = document.getElementById('statusValue'), lastUpdateValue = document.getElementById('lastUpdateValue'), baRankingListDiv = document.getElementById('baRankingList'), resultsTableContainer = document.getElementById('resultsTableContainer');
         const commissionCard = document.getElementById('commissionCard');
         const totalCommissionValue = document.getElementById('totalCommissionValue');
@@ -295,25 +422,22 @@ document.addEventListener('DOMContentLoaded', function() {
             commissionCard.style.display = isSpecialUser ? 'flex' : 'none';
         }
         
-        // ======================= SCROLLING NAME LOGIC =======================
         if(baNameDisplay) {
-            baNameDisplay.innerHTML = ''; // Clear previous content
-            baNameDisplay.className = 'ba-name-display'; // Reset class
+            baNameDisplay.innerHTML = ''; 
+            baNameDisplay.className = 'ba-name-display'; 
             const selectedNames = data.searchCriteria?.baNames || [];
             
-            // If more than one BA is selected by a special user, create the marquee
             if (selectedNames.length > 1 && isSpecialUser) {
                 const namesContainer = document.createElement('div');
                 namesContainer.className = 'ba-name-scroll-content';
 
-                // We duplicate the content to create a seamless loop
                 const appendNames = () => {
-                    selectedNames.forEach((name, index) => {
+                    selectedNames.forEach((name) => {
                         const nameSpan = document.createElement('span');
                         nameSpan.className = 'ba-name-scroll-item';
                         nameSpan.textContent = name;
                         namesContainer.appendChild(nameSpan);
-                        // Add a separator after each name
+                        
                         const separatorSpan = document.createElement('span');
                         separatorSpan.className = 'ba-name-scroll-separator';
                         separatorSpan.textContent = '|';
@@ -321,19 +445,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                 };
 
-                appendNames(); // First set of names
-                appendNames(); // Second set for seamless scroll
+                appendNames(); 
+                appendNames(); 
 
-                // Adjust animation speed based on the number of names
-                const animationDuration = selectedNames.length * 5; // 5 seconds per name
+                const animationDuration = selectedNames.length * 5;
                 namesContainer.style.animationDuration = `${animationDuration}s`;
                 baNameDisplay.appendChild(namesContainer);
             } else {
-                // Otherwise, just display the static name
                 baNameDisplay.textContent = data.baNameDisplay || "ALL BA's";
             }
         }
-        // ======================================================================
 
         const summary = data.summary || {};
         if(totalRegistrationValue) animateValue(totalRegistrationValue, 0, summary.totalRegistration || 0, 700);

@@ -391,3 +391,124 @@ body.light-mode .results-table-container td > select {
 .ba-name-display:hover .ba-name-scroll-content {
     animation-play-state: paused;
 }
+
+/* --- Admin Panel Styles --- */
+#adminArea {
+    background-color: var(--content-bg);
+    padding: 20px 30px;
+    justify-content: flex-start;
+    align-items: center;
+}
+
+.admin-panel-container {
+    width: 100%;
+    max-width: 800px;
+    font-family: var(--roboto-font);
+}
+
+.admin-panel-container h1 {
+    font-family: var(--bebas-font);
+    font-size: 2.5rem;
+    color: var(--text-color-main);
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.admin-panel-container p {
+    text-align: center;
+    color: var(--text-color-subtle);
+    margin-bottom: 20px;
+}
+
+.admin-status-message {
+    text-align: center;
+    font-weight: bold;
+    min-height: 20px;
+    margin-bottom: 15px;
+}
+.admin-status-message.saving { color: #ffc107; }
+.admin-status-message.success { color: #28a745; }
+.admin-status-message.error { color: var(--error-color); }
+
+#userManagementTable {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#userManagementTable th, #userManagementTable td {
+    border: 1px solid var(--table-border-color);
+    padding: 10px 15px;
+    text-align: left;
+}
+
+#userManagementTable th {
+    background-color: var(--table-header-bg);
+    color: var(--table-header-text);
+    font-family: var(--bebas-font);
+    font-size: 1.1em;
+    letter-spacing: 0.5px;
+}
+
+#userManagementTable td {
+    background-color: var(--panel-bg);
+}
+
+#userManagementTable tr:nth-child(even) td {
+    background-color: var(--content-bg);
+}
+
+/* --- Toggle Switch CSS --- */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 28px;
+}
+
+.switch input { 
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #555;
+  transition: .4s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: .4s;
+}
+
+input:checked + .slider {
+  background-color: var(--primary-blue);
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px var(--primary-blue);
+}
+
+input:checked + .slider:before {
+  transform: translateX(22px);
+}
+
+.slider.round {
+  border-radius: 34px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
+}

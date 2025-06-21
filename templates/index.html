@@ -19,6 +19,9 @@
             <button id="homeTabBtn" class="tab-button active" onclick="showTab('homeArea', this)">Home</button>
             <button id="dashboardTabBtn" class="tab-button" onclick="showTab('dashboardDisplayArea', this)">Dashboard</button>
             <button id="salaryTabBtn" class="tab-button" onclick="showTab('salarySchemeArea', this)">Salary Scheme</button>
+            <!-- ================== NEW ADMIN TAB (hidden by default) ================== -->
+            <button id="adminTabBtn" class="tab-button" onclick="showTab('adminArea', this)" style="display: none;">Admin</button>
+            <!-- ======================================================================= -->
         </div>
         <div id="userInfo" class="user-info" style="display: none;">
             <span id="userName" class="user-name"></span>
@@ -30,7 +33,7 @@
 
   <div class="app-container">
     <div id="mainContentWrapper">
-        <!-- HOME TAB CONTENT -->
+        <!-- HOME TAB CONTENT (Unchanged) -->
         <div id="homeArea" class="tab-content active-content">
             <div id="homeContentCentered" class="home-content-centered">
                 <div id="homeTitleContainer" class="home-title-container">
@@ -49,9 +52,7 @@
                             <option value="Week 2">Week 2</option>
                             <option value="Week 3">Week 3</option>
                             <option value="Week 4">Week 4</option>
-                            <!-- ================== NEW WEEK 5 OPTION ================== -->
                             <option id="week5Option" value="Week 5">Week 5</option>
-                            <!-- ======================================================= -->
                         </select>
                         <input type="text" id="baNameInput" placeholder="ENTER BA NAME" autocomplete="off" list="baNameSuggestions">
                         <datalist id="baNameSuggestions"></datalist>
@@ -63,7 +64,7 @@
             </div>
         </div>
 
-        <!-- DASHBOARD TAB CONTENT -->
+        <!-- DASHBOARD TAB CONTENT (Unchanged) -->
         <div id="dashboardDisplayArea" class="tab-content">
             <div id="dashboardPlaceholder" class="dashboard-placeholder-message">
                 <p> 🔎 Please perform a search to view dashboard data.</p>
@@ -111,7 +112,7 @@
             </div>
         </div>
 
-        <!-- SALARY SCHEME TAB CONTENT -->
+        <!-- SALARY SCHEME TAB CONTENT (Unchanged) -->
         <div id="salarySchemeArea" class="tab-content">
             <h1 class="ba-payout-header">BA PAYOUT SCHEME</h1>
             <div class="salary-scheme-table-container">
@@ -139,6 +140,20 @@
                 </ul>
             </div>
         </div>
+
+        <!-- ================== NEW ADMIN AREA CONTENT ================== -->
+        <div id="adminArea" class="tab-content">
+            <div class="admin-panel-container">
+                <h1>User Management</h1>
+                <p>Grant or revoke 'Special Feature' access for users. Admins have all special features by default.</p>
+                <div id="adminStatusMessage" class="admin-status-message"></div>
+                <div id="userManagementTableContainer">
+                    <div class="loading-indicator">⏳ Loading users...</div>
+                </div>
+            </div>
+        </div>
+        <!-- ========================================================== -->
+
     </div>
   </div>
   <div id="globalErrorMessage" class="error-message-main" style="padding: 10px; text-align: center; display:none;"></div>
