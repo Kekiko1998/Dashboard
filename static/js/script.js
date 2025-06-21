@@ -24,7 +24,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const saveButton = document.getElementById('saveButton');
     const saveStatusMessage = document.getElementById('saveStatusMessage');
 
-
     let isSpecialUser = false;
     let selectedBaNamesState = [];
     const statusOptions = ['PAID', 'DELAYED', 'UPDATING', 'INVALID', 'UNOFFICIAL'];
@@ -148,9 +147,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }).catch(err => console.error('Error fetching BA names:', err));
     }
     
-    // =================================================================
-    // --- UI MANAGEMENT (DARK MODE & TABS) - THIS BLOCK WAS RESTORED ---
-    // =================================================================
+    // --- UI MANAGEMENT (DARK MODE & TABS) ---
     function setDarkMode(isDark) {
         if (isDark) {
             document.body.classList.remove('light-mode');
@@ -162,16 +159,14 @@ document.addEventListener('DOMContentLoaded', function() {
             localStorage.setItem('dashboardTheme', 'light');
         }
     }
-    // Event listener for the toggle button
     darkModeToggleButton.addEventListener('click', () => {
         const isCurrentlyDark = !document.body.classList.contains('light-mode');
         setDarkMode(!isCurrentlyDark);
     });
-    // Set the initial theme on page load based on localStorage
     if (localStorage.getItem('dashboardTheme') === 'light') {
         setDarkMode(false);
     } else {
-        setDarkMode(true); // Default to dark mode
+        setDarkMode(true);
     }
 
     window.showTab = function(tabId, clickedButton) {
@@ -187,7 +182,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (isSpecialUser) switchToSimpleView();
         }
     };
-    // =================================================================
 
     if (searchButton) { searchButton.addEventListener('click', performSearch); }
 
@@ -272,6 +266,13 @@ document.addEventListener('DOMContentLoaded', function() {
     function populateDashboardWithData(data) {
         // --- Part 1: Populate Left Panel ---
         const baNameDisplay = document.getElementById('baNameDisplay'), totalRegistrationValue = document.getElementById('totalRegistrationValue'), totalValidFdValue = document.getElementById('totalValidFdValue'), totalSuspendedValue = document.getElementById('totalSuspendedValue'), totalSalaryValue = document.getElementById('totalSalaryValue'), totalIncentiveValue = document.getElementById('totalIncentiveValue'), monthDisplay = document.getElementById('monthDisplay'), weekDisplay = document.getElementById('weekDisplay'), dateRangeDisplay = document.getElementById('dateRangeDisplay'), statusValue = document.getElementById('statusValue'), lastUpdateValue = document.getElementById('lastUpdateValue'), baRankingListDiv = document.getElementById('baRankingList'), resultsTableContainer = document.getElementById('resultsTableContainer');
+        const commissionCard = document.getElementById('commissionCard');
+        const totalCommissionValue = document.getElementById('totalCommissionValue');
+
+        // FIX 1: The check for the commission card's visibility was moved here from the top level.
+        if (commissionCard) {
+            commissionCard.style.display = isSpecialUser ? 'flex' : 'none';
+        }
         
         if(baNameDisplay) {
             baNameDisplay.innerHTML = '';
@@ -310,6 +311,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if(totalSuspendedValue) animateValue(totalSuspendedValue, 0, summary.totalSuspended || 0, 700);
         if(totalSalaryValue) animateValue(totalSalaryValue, 0, summary.totalSalary || 0, 700, true);
         if(totalIncentiveValue) animateValue(totalIncentiveValue, 0, summary.totalIncentives || 0, 700, true);
+        
+        if (totalCommissionValue && isSpecialUser) {
+            animateValue(totalCommissionValue, 0, summary.totalCommission || 0, 700);
+        }
+        // FIX 2: Added the missing closing brace for the 'if (totalCommissionValue...)' block.
+        
         if(monthDisplay) monthDisplay.textContent = data.monthDisplay || "N/A";
         if(weekDisplay) weekDisplay.textContent = data.weekDisplay || "N/A";
         if(dateRangeDisplay) dateRangeDisplay.textContent = data.dateRangeDisplay || ""; 
@@ -357,12 +364,10 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const editableColumns = ['MONTH', 'WEEK', 'BA Name', 'REG', 'Valid FD', 'Suspended FD', 'Total GGR'];
 
-            // Create Headers
             const thNo = document.createElement('th'); thNo.textContent = 'No.'; headerRow.appendChild(thNo);
             headers.forEach(text => { const th = document.createElement('th'); th.textContent = text.toUpperCase(); headerRow.appendChild(th); });
             thead.appendChild(headerRow); table.appendChild(thead);
 
-            // Create Rows and Cells
             data.resultsTable.forEach((rowData, rowIndex) => {
                 const tr = document.createElement('tr');
                 tr.dataset.palcode = rowData[0];
