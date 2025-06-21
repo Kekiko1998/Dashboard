@@ -184,7 +184,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
-    // ================== NEW FUNCTION FOR WEEK 5 LOGIC ==================
     function handleMonthChange() {
         const selectedMonth = monthSelect.value;
         const week5Option = document.getElementById('week5Option');
@@ -194,25 +193,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 week5Option.style.display = 'block';
             } else {
                 week5Option.style.display = 'none';
-                // If Week 5 was selected, reset the week dropdown to avoid confusion
                 if (weekSelect.value === 'Week 5') {
-                    weekSelect.value = ''; // Resets to the "SELECT WEEK" placeholder
+                    weekSelect.value = '';
                 }
             }
         }
     }
-    // Add event listener to the month dropdown
     monthSelect.addEventListener('change', handleMonthChange);
-    // Call the function once on page load to set the initial state correctly
     handleMonthChange();
-    // ===================================================================
-
 
     if (searchButton) { searchButton.addEventListener('click', performSearch); }
 
     // --- Search & Data Handling ---
-    // ... (The rest of the script, from performSearch onwards, is unchanged) ...
     function performSearch() {
+        // ... (This function is unchanged) ...
         const month = monthSelect.value, week = weekSelect.value, palcode = palcodeInput.value.trim();
         let baNamesToSearch;
         const baNameInputValue = document.getElementById('baNameInput').value.trim();
@@ -248,6 +242,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function handleSearchSuccess(data) {
+        // ... (This function is unchanged) ...
         searchButton.disabled = false; searchButton.textContent = 'SEARCH'; loadingIndicator.style.display = 'none';
         if (data.error || (!data.resultsTable && !data.summary)) {
             dashboardSearchError.querySelector('p').textContent = `⚠️ ${data.error || 'An unknown error occurred.'}`;
@@ -263,6 +258,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     function handleSearchFailure(error) {
+        // ... (This function is unchanged) ...
         if (error.message.includes('Session expired')) { console.log("Session expired, redirecting..."); return; }
         searchButton.disabled = false; searchButton.textContent = 'SEARCH'; loadingIndicator.style.display = 'none';
         dashboardSearchError.querySelector('p').textContent = `❌ Script Error: ${error.message || 'Unknown error.'}`;
@@ -271,6 +267,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function determineSummaryStatus(tableData) {
+        // ... (This function is unchanged) ...
         const statusColumnIndex = 11;
         if (!tableData || tableData.length === 0) return { text: 'N/A', class: '' };
         const statuses = new Set(tableData.map(row => row[statusColumnIndex]?.toString().trim().toLowerCase()).filter(Boolean));
@@ -298,36 +295,45 @@ document.addEventListener('DOMContentLoaded', function() {
             commissionCard.style.display = isSpecialUser ? 'flex' : 'none';
         }
         
+        // ======================= SCROLLING NAME LOGIC =======================
         if(baNameDisplay) {
-            baNameDisplay.innerHTML = '';
-            baNameDisplay.className = 'ba-name-display';
+            baNameDisplay.innerHTML = ''; // Clear previous content
+            baNameDisplay.className = 'ba-name-display'; // Reset class
             const selectedNames = data.searchCriteria?.baNames || [];
-            if (selectedNames.length > 1 && isSpecialUser) { 
-                baNameDisplay.classList.add('multi-select-display');
+            
+            // If more than one BA is selected by a special user, create the marquee
+            if (selectedNames.length > 1 && isSpecialUser) {
                 const namesContainer = document.createElement('div');
                 namesContainer.className = 'ba-name-scroll-content';
+
+                // We duplicate the content to create a seamless loop
                 const appendNames = () => {
                     selectedNames.forEach((name, index) => {
                         const nameSpan = document.createElement('span');
                         nameSpan.className = 'ba-name-scroll-item';
                         nameSpan.textContent = name;
                         namesContainer.appendChild(nameSpan);
-                        if (index < selectedNames.length - 1 || selectedNames.length > 1) {
-                             const separatorSpan = document.createElement('span');
-                             separatorSpan.className = 'ba-name-scroll-separator';
-                             separatorSpan.textContent = '•';
-                             namesContainer.appendChild(separatorSpan);
-                        }
+                        // Add a separator after each name
+                        const separatorSpan = document.createElement('span');
+                        separatorSpan.className = 'ba-name-scroll-separator';
+                        separatorSpan.textContent = '•';
+                        namesContainer.appendChild(separatorSpan);
                     });
                 };
-                appendNames(); appendNames();
-                const animationDuration = selectedNames.length * 3;
-                namesContainer.style.animation = `marquee-scroll ${animationDuration}s linear infinite`;
+
+                appendNames(); // First set of names
+                appendNames(); // Second set for seamless scroll
+
+                // Adjust animation speed based on the number of names
+                const animationDuration = selectedNames.length * 5; // 5 seconds per name
+                namesContainer.style.animationDuration = `${animationDuration}s`;
                 baNameDisplay.appendChild(namesContainer);
             } else {
+                // Otherwise, just display the static name
                 baNameDisplay.textContent = data.baNameDisplay || "ALL BA's";
             }
         }
+        // ======================================================================
 
         const summary = data.summary || {};
         if(totalRegistrationValue) animateValue(totalRegistrationValue, 0, summary.totalRegistration || 0, 700);
@@ -436,6 +442,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (saveButton) {
         saveButton.addEventListener('click', async () => {
+            // ... (This function is unchanged) ...
             saveButton.disabled = true;
             saveStatusMessage.textContent = 'Saving...';
             saveStatusMessage.className = 'saving';
@@ -489,6 +496,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function animateValue(element, start, end, duration, isCurrency = false) {
+        // ... (This function is unchanged) ...
         if (!element || typeof end !== 'number' || isNaN(end)) {
              if(element && isCurrency) element.textContent = `₱ 0.00`;
              else if(element) element.textContent = `0`;

@@ -352,3 +352,42 @@ body.light-mode .results-table-container td > select {
 .results-table-container td[data-field="salary"] {
     cursor: not-allowed;
 }
+
+/* --- Styles for Scrolling Multi-BA Name Display --- */
+
+/* 1. The main container for the BA name display */
+#dashboardDataDisplay .ba-name-display {
+    text-align: center; /* Center single names */
+    overflow: hidden;   /* Hide the overflowing text for the marquee */
+    white-space: nowrap;/* Prevent line breaks */
+    position: relative; /* Needed for positioning the marquee */
+}
+
+/* 2. The inner container that will actually scroll */
+.ba-name-scroll-content {
+    display: inline-block; /* Allows the element to be animated horizontally */
+    padding-left: 100%;    /* Start the animation off-screen to the right */
+    animation: marquee-scroll 15s linear infinite; /* The animation itself */
+}
+
+/* 3. Styles for the individual name and separator items */
+.ba-name-scroll-item {
+    display: inline-block;
+}
+.ba-name-scroll-separator {
+    display: inline-block;
+    margin: 0 10px; /* Space around the '•' separator */
+    color: var(--primary-blue);
+    font-weight: bold;
+}
+
+/* 4. The animation keyframes that move the text from right to left */
+@keyframes marquee-scroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+}
+
+/* Stop the animation on hover for better usability */
+.ba-name-display:hover .ba-name-scroll-content {
+    animation-play-state: paused;
+}
