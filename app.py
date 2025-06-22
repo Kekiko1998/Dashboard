@@ -184,7 +184,7 @@ def logout():
     return redirect(url_for('login'))
 
 # --- API Routes ---
-@app.route('/api/user-info', methods=['GET'])
+@app.route('/api/user-info2', methods=['GET'])
 @login_required
 def get_user_info():
     return jsonify({
@@ -196,7 +196,7 @@ def get_user_info():
 
 @app.route('/api/users', methods=['GET'])
 @login_required
-def get_all_users():
+def get_all_users2():
     if not current_user.is_admin:
         return jsonify({"error": "Forbidden"}), 403
     
