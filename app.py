@@ -186,7 +186,7 @@ def logout():
 # --- API Routes ---
 @app.route('/api/user-info2', methods=['GET'])
 @login_required
-def get_user_info():
+def get_user_info2():
     return jsonify({
         "email": current_user.email,
         "name": current_user.name,
