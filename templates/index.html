@@ -18,10 +18,10 @@
         <div class="tabs">
             <button id="homeTabBtn" class="tab-button active" onclick="showTab('homeArea', this)">Home</button>
             <button id="dashboardTabBtn" class="tab-button" onclick="showTab('dashboardDisplayArea', this)">Dashboard</button>
+            <button id="payoutFormTabBtn" class="tab-button" onclick="showTab('payoutFormArea', this)">Submit Payout</button>
+            <button id="myPayoutTabBtn" class="tab-button" onclick="showTab('myPayoutArea', this)" style="display: none;">My Payout</button>
             <button id="salaryTabBtn" class="tab-button" onclick="showTab('salarySchemeArea', this)">Salary Scheme</button>
-            <!-- ================== NEW ADMIN TAB (hidden by default) ================== -->
             <button id="adminTabBtn" class="tab-button" onclick="showTab('adminArea', this)" style="display: none;">Admin</button>
-            <!-- ======================================================================= -->
         </div>
         <div id="userInfo" class="user-info" style="display: none;">
             <span id="userName" class="user-name"></span>
@@ -41,88 +41,130 @@
                     <span class="home-subtitle">By Love</span>
                 </div>
                 <div id="homeSearchControlsContainer" class="home-search-controls-container">
-                    <!-- Inside #homeArea -> .home-search-controls-container -> .home-search-controls -->
-<div class="home-search-controls">
-    <select id="monthSelect">
-        <option value="" disabled selected>SELECT MONTH</option>
-        <option value="January">January</option><option value="February">February</option><option value="March">March</option><option value="April">April</option><option value="May">May</option><option value="June">June</option><option value="July">July</option><option value="August">August</option><option value="September">September</option><option value="October">October</option><option value="November">November</option><option value="December">December</option>
-    </select>
-    <select id="weekSelect">
-        <option value="" disabled selected>SELECT WEEK</option>
-        <option value="Week 1">Week 1</option>
-        <option value="Week 2">Week 2</option>
-        <option value="Week 3">Week 3</option>
-        <option value="Week 4">Week 4</option>
-        <option id="week5Option" value="Week 5">Week 5</option>
-    </select>
-    
-    <!-- ================== NEW MULTI-SELECT DROPDOWN SYSTEM ================== -->
-    <div id="baNameSelectContainer" class="ba-name-select-container">
-        <button id="baNameSelectButton" class="ba-name-select-button">SELECT BA NAME</button>
-        <div id="baNameDropdown" class="ba-name-dropdown">
-            <input type="text" id="baNameSearchInput" placeholder="Search names...">
-            <div id="baNameCheckboxList" class="ba-name-checkbox-list">
-                <!-- Checkboxes will be inserted here by JavaScript -->
+                    <div class="home-search-controls">
+                        <select id="monthSelect">
+                            <option value="" disabled selected>SELECT MONTH</option>
+                            <option value="January">January</option><option value="February">February</option><option value="March">March</option><option value="April">April</option><option value="May">May</option><option value="June">June</option><option value="July">July</option><option value="August">August</option><option value="September">September</option><option value="October">October</option><option value="November">November</option><option value="December">December</option>
+                        </select>
+                        <select id="weekSelect">
+                            <option value="" disabled selected>SELECT WEEK</option>
+                            <option value="Week 1">Week 1</option>
+                            <option value="Week 2">Week 2</option>
+                            <option value="Week 3">Week 3</option>
+                            <option value="Week 4">Week 4</option>
+                            <option id="week5Option" value="Week 5">Week 5</option>
+                        </select>
+                        
+                        <!-- Multi-Select Dropdown System for users with permission -->
+                        <div id="baNameSelectContainer" class="ba-name-select-container" style="display: none;">
+                            <button id="baNameSelectButton" class="ba-name-select-button">SELECT BA NAME</button>
+                            <div id="baNameDropdown" class="ba-name-dropdown">
+                                <input type="text" id="baNameSearchInput" placeholder="Search names...">
+                                <div id="baNameCheckboxList" class="ba-name-checkbox-list"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Original Input for regular users -->
+                        <input type="text" id="baNameInput" placeholder="ENTER BA NAME" autocomplete="off" list="baNameSuggestions">
+                        <datalist id="baNameSuggestions"></datalist>
+                        
+                        <input type="text" id="palcodeInput" placeholder="ENTER PALCODE (OPTIONAL)">
+                        <button id="searchButton" class="search-button">SEARCH</button>
+                    </div>
+                    <div id="homeErrorMessage" class="error-message-main"></div>
+                </div>
             </div>
         </div>
-    </div>
-    <!-- ==================================================================== -->
-    
-    <input type="text" id="baNameInput" placeholder="ENTER BA NAME" autocomplete="off" list="baNameSuggestions" style="display: none;">
-    <datalist id="baNameSuggestions"></datalist>
-    
-    <input type="text" id="palcodeInput" placeholder="ENTER PALCODE (OPTIONAL)">
-    <button id="searchButton" class="search-button">SEARCH</button>
-</div>
 
         <!-- DASHBOARD TAB CONTENT -->
-        <div id="dashboardDisplayArea" class="tab-content">
-            <div id="dashboardPlaceholder" class="dashboard-placeholder-message">
-                <p> 🔎 Please perform a search to view dashboard data.</p>
-            </div>
-            <div id="loadingIndicator" class="loading-indicator" style="display: none;">
-                ⏳ Fetching dashboard data, please wait...
-            </div>
-            <div id="dashboardSearchError" class="dashboard-placeholder-message" style="display: none; color: orange;">
-                <p>⚠️ No data found for the selected criteria, or the search parameters were insufficient.</p>
-            </div>
-            <div id="dashboardDataDisplay" class="dashboard-content-area" style="display: none;">
-              <div class="left-panel">
-                <div id="baNameDisplay" class="ba-name-display"></div>
-                <div class="summary-section"><h4>SUMMARY</h4></div>
-                <div class="summary-cards-container">
-                  <div class="summary-card"><span class="summary-label">TOTAL REG</span><span class="summary-value" id="totalRegistrationValue">0</span></div>
-                  <div class="summary-card"><span class="summary-label">TOTAL VALID FD</span><span class="summary-value" id="totalValidFdValue">0</span></div>
-                  <div class="summary-card"><span class="summary-label">TOTAL SUSPENDED</span><span class="summary-value" id="totalSuspendedValue">0</span></div>
-                  <div class="summary-card"><span class="summary-label">TOTAL SALARY</span><span class="summary-value" id="totalSalaryValue">0</span></div>
-                  <div class="summary-card"><span class="summary-label">INCENTIVES</span><span class="summary-value" id="totalIncentiveValue">₱0.00</span></div>
-                  <div id="commissionCard" class="summary-card" style="display: none;">
-                    <span class="summary-label">COMMISSION</span>
-                    <span class="summary-value" id="totalCommissionValue">0</span>
-                  </div>
-                </div>
-                <div class="filter-display">
-                    <span id="monthDisplay">MONTH</span>
-                    <span id="weekDisplay">WEEK</span>
-                </div>
-                <div id="dateRangeDisplay" class="date-range-display"></div>
-                <div class="status-display">STATUS: <span id="statusValue">N/A</span></div>
-                <div class="ba-ranking-section">
-                    <h4>TOP BA RANKING (VALID FD)</h4>
-                    <div id="baRankingList" class="ba-ranking-list"></div>
-                </div>
-              </div>
-              <div class="right-panel">
-                <div id="tableControls" class="table-controls" style="display: none;">
-                    <button id="saveButton" class="save-button">Save Changes</button>
-                    <span id="saveStatusMessage"></span>
-                </div>
-                <div id="resultsTableContainer" class="results-table-container"></div>
-                <div class="last-update-display">LAST UPDATE: <span id="lastUpdateValue">N/A</span></div>
-              </div>
+<div id="dashboardDisplayArea" class="tab-content">
+    <div id="dashboardPlaceholder" class="dashboard-placeholder-message">
+        <p> 🔎 Please perform a search to view dashboard data.</p>
+    </div>
+    <div id="loadingIndicator" class="loading-indicator" style="display: none;">
+        ⏳ Fetching dashboard data, please wait...
+    </div>
+    <div id="dashboardSearchError" class="dashboard-placeholder-message" style="display: none; color: orange;">
+        <p>⚠️ No data found for the selected criteria, or the search parameters were insufficient.</p>
+    </div>
+    <div id="dashboardDataDisplay" class="dashboard-content-area" style="display: none;">
+      <div class="left-panel">
+          <!-- ================== CORRECTED HTML ORDER ================== -->
+        
+        <div id="baNameDisplay" class="ba-name-display"></div>
+        
+        <div class="summary-section"><h4>SUMMARY</h4></div>
+        <div class="summary-cards-container">
+          <div class="summary-card"><span class="summary-label">TOTAL REG</span><span class="summary-value" id="totalRegistrationValue">0</span></div>
+          <div class="summary-card"><span class="summary-label">TOTAL VALID FD</span><span class="summary-value" id="totalValidFdValue">0</span></div>
+          <div class="summary-card"><span class="summary-label">TOTAL SUSPENDED</span><span class="summary-value" id="totalSuspendedValue">0</span></div>
+          <div class="summary-card"><span class="summary-label">TOTAL SALARY</span><span class="summary-value" id="totalSalaryValue">0</span></div>
+          <div class="summary-card"><span class="summary-label">INCENTIVES</span><span class="summary-value" id="totalIncentiveValue">₱0.00</span></div>
+          <div id="commissionCard" class="summary-card" style="display: none;"><span class="summary-label">COMMISSION</span><span class="summary-value" id="totalCommissionValue">0</span></div>
+        </div>
+
+        <div class="filter-display">
+          <span id="monthDisplay">MONTH</span>
+          <span id="weekDisplay">WEEK</span>
+        </div>
+        <div id="dateRangeDisplay" class="date-range-display"></div>
+        <div class="status-display">STATUS: <span id="statusValue">N/A</span></div>
+        
+        <!-- BA Ranking is now at the bottom of the main content flow -->
+        <div class="ba-ranking-section">
+          <h4>TOP BA RANKING (VALID FD)</h4>
+          <div id="baRankingList" class="ba-ranking-list"></div>
+        </div>
+        <!-- ========================================================== -->
+        
+        <!-- NEW TAB FOR VIEWING PAYOUT INFO -->
+        <div id="myPayoutArea" class="tab-content">
+            <div id="myPayoutContent" class="payout-panel-container">
+                <!-- Content will be loaded here by JS -->
             </div>
         </div>
 
+        <!-- Renamed Payout Area to PayoutFormArea -->
+        <div id="payoutFormArea" class="tab-content">
+            <div class="payout-panel-container">
+                <h1>Submit Payout Information</h1>
+                <p>Please provide your payment details and upload a QR code image.</p>
+                <div class="upload-warnings">
+                    <h4>Important Reminders:</h4>
+                    <ul>
+                        <li>Ensure the Account Name and Number are **exactly correct**.</li>
+                        <li>The uploaded image **must be a clear QR code**.</li>
+                        <li>File size limit is **5MB**.</li>
+                        <li>Allowed format is **JPEG/JPG or PNG**.</li>
+                        <li>Any new upload will **overwrite** your previous submission.</li>
+                    </ul>
+                </div>
+                <form id="payoutForm" class="payout-form">
+                    <div class="form-group">
+                        <label for="payoutBaName">BA Name:</label>
+                        <input type="text" id="payoutBaName" name="payoutBaName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="mopAccountName">MOP Account Name:</label>
+                        <input type="text" id="mopAccountName" name="mopAccountName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="mopNumber">Number:</label>
+                        <input type="text" id="mopNumber" name="mopNumber" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="payoutImage">Upload QR Code Image:</label>
+                        <input type="file" id="payoutImage" name="payoutImage" accept="image/jpeg, image/png" required>
+                    </div>
+                    <div id="imagePreviewContainer" class="image-preview-container" style="display: none;">
+                        <img id="imagePreview" src="#" alt="Image Preview"/>
+                    </div>
+                    <button type="submit" id="uploadButton" class="upload-button">Upload Information</button>
+                </form>
+                <div id="uploadStatusMessage" class="upload-status-message"></div>
+            </div>
+        </div>
+        
         <!-- SALARY SCHEME TAB CONTENT -->
         <div id="salarySchemeArea" class="tab-content">
             <h1 class="ba-payout-header">BA PAYOUT SCHEME</h1>
@@ -152,7 +194,7 @@
             </div>
         </div>
 
-        <!-- ================== NEW ADMIN AREA CONTENT ================== -->
+        <!-- ADMIN AREA CONTENT -->
         <div id="adminArea" class="tab-content">
             <div class="admin-panel-container">
                 <h1>User Management</h1>
@@ -163,7 +205,6 @@
                 </div>
             </div>
         </div>
-        <!-- ========================================================== -->
 
     </div>
   </div>

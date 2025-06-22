@@ -429,3 +429,93 @@ input:checked + .slider:before {
 .slider.round:before {
   border-radius: 50%;
 }
+
+/* --- Custom Multi-Select Dropdown Styles --- */
+.ba-name-select-container {
+    position: relative;
+    flex-basis: 160px;
+    flex-grow: 1;
+}
+
+.ba-name-select-button {
+    width: 100%;
+    font-family: var(--bebas-font);
+    font-size: 1rem;
+    letter-spacing: 0.5px;
+    padding: 8px 10px;
+    border: 1px solid var(--input-border-color);
+    border-radius: 3px;
+    background-color: var(--input-bg);
+    color: var(--input-text);
+    text-transform: uppercase;
+    text-align: left;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+body #homeArea .home-search-controls .ba-name-select-button {
+    padding: 0.75rem 0.75rem; /* Match mobile padding */
+}
+.ba-name-select-button.has-selection {
+    color: var(--primary-blue);
+    font-weight: bold;
+}
+
+.ba-name-dropdown {
+    display: none; /* Hidden by default */
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    max-height: 250px;
+    overflow-y: auto;
+    background-color: var(--panel-bg);
+    border: 1px solid var(--input-border-color);
+    border-top: none;
+    border-radius: 0 0 3px 3px;
+    z-index: 1010;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    box-sizing: border-box;
+}
+
+.ba-name-dropdown.show {
+    display: block;
+}
+
+.ba-name-dropdown #baNameSearchInput {
+    width: 100%;
+    padding: 8px 10px;
+    box-sizing: border-box;
+    border: none;
+    border-bottom: 1px solid var(--input-border-color);
+    background-color: var(--input-bg);
+    color: var(--input-text);
+    outline: none;
+}
+
+.ba-name-checkbox-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.ba-name-checkbox-list label {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-family: var(--roboto-font);
+    font-size: 0.9em;
+    transition: background-color 0.2s;
+}
+
+.ba-name-checkbox-list label:hover {
+    background-color: var(--table-hover-bg);
+}
+
+.ba-name-checkbox-list input[type="checkbox"] {
+    margin-right: 10px;
+    width: 16px;
+    height: 16px;
+    accent-color: var(--primary-blue);
+}
