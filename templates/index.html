@@ -89,7 +89,10 @@
     </div>
     <div id="dashboardDataDisplay" class="dashboard-content-area" style="display: none;">
       <div class="left-panel">
+          <!-- ================== CORRECTED HTML ORDER ================== -->
+        
         <div id="baNameDisplay" class="ba-name-display"></div>
+        
         <div class="summary-section"><h4>SUMMARY</h4></div>
         <div class="summary-cards-container">
           <div class="summary-card"><span class="summary-label">TOTAL REG</span><span class="summary-value" id="totalRegistrationValue">0</span></div>
@@ -99,6 +102,7 @@
           <div class="summary-card"><span class="summary-label">INCENTIVES</span><span class="summary-value" id="totalIncentiveValue">₱0.00</span></div>
           <div id="commissionCard" class="summary-card" style="display: none;"><span class="summary-label">COMMISSION</span><span class="summary-value" id="totalCommissionValue">0</span></div>
         </div>
+
         <div class="filter-display">
           <span id="monthDisplay">MONTH</span>
           <span id="weekDisplay">WEEK</span>
@@ -106,24 +110,12 @@
         <div id="dateRangeDisplay" class="date-range-display"></div>
         <div class="status-display">STATUS: <span id="statusValue">N/A</span></div>
         
-        <!-- ================== BA RANKING SECTION MOVED BACK HERE ================== -->
+        <!-- BA Ranking is now at the bottom of the main content flow -->
         <div class="ba-ranking-section">
           <h4>TOP BA RANKING (VALID FD)</h4>
           <div id="baRankingList" class="ba-ranking-list"></div>
         </div>
-        <!-- ====================================================================== -->
-        
-      </div>
-      <div class="right-panel">
-        <div id="tableControls" class="table-controls" style="display: none;">
-            <button id="saveButton" class="save-button">Save Changes</button>
-            <span id="saveStatusMessage"></span>
-        </div>
-        <div id="resultsTableContainer" class="results-table-container"></div>
-        <div class="last-update-display">LAST UPDATE: <span id="lastUpdateValue">N/A</span></div>
-      </div>
-    </div>
-</div>
+        <!-- ========================================================== -->
         
         <!-- NEW TAB FOR VIEWING PAYOUT INFO -->
         <div id="myPayoutArea" class="tab-content">
