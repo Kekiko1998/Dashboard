@@ -48,13 +48,20 @@ document.addEventListener('DOMContentLoaded', function() {
         userNameSpan.textContent = userInfo.name;
         userInfoDiv.style.display = 'flex';
 
+         // ================== ADDED PRE-FILL LOGIC ==================
+        // Pre-fill the BA Name in the payout form
+        if (payoutBaNameInput) {
+            payoutBaNameInput.value = userInfo.name || '';
+        }
+        // ========================================================
+        
         if (isAdmin) {
             adminTabBtn.style.display = 'block';
         }
 
-        const activeTabButton = document.querySelector('.tab-button.active');
-        if (userPermissions.has('MULTI_SELECT') && activeTabButton && activeTabButton.id === 'homeTabBtn') {
-            switchToMultiSelectView();
+        if (userPermissions.has('MULTI_SELECT') || userPermissions.has('SEARCH_ALL')) {
+            // Logic to handle which BA name input is shown
+            // This part is for the SEARCH controls, not the PAYOUT form
         }
     }
 

@@ -278,14 +278,18 @@ def save_dashboard():
     pass
 
 # ================== NEW API ENDPOINT FOR FILE UPLOAD ==================
-@app.route('/api/upload_payout_info', methods=['POST'])
+app.route('/api/upload_payout_info', methods=['POST'])
 @login_required
 def upload_payout_info():
-    if 'mopAccountName' not in request.form or 'mopNumber' not in request.form:
-        return jsonify({"success": False, "error": "Missing account name or number."}), 400
+    if 'payoutBaName' not in request.form or 'mopAccountName' not in request.form or 'mopNumber' not in request.form:
+        return jsonify({"success": False, "error": "Missing form fields. Please fill out all required information."}), 400
+    
     if 'payoutImage' not in request.files:
         return jsonify({"success": False, "error": "No image file was uploaded."}), 400
 
+    ba_name = request.form['payoutBaName']
+    mop_account_name = request.form['mopAccountName']
+    mop_number = request.form['mopNumber']
     image_file = request.files['payoutImage']
 
     if image_file.filename == '':
@@ -293,10 +297,10 @@ def upload_payout_info():
 
     try:
         drive_service = build('drive', 'v3', credentials=creds_service_account)
+
         
-        # We use the user's name from their logged-in session for the filename
-        user_name = current_user.name
-        filename = f"{user_name}.jpeg"
+        safe_ba_name = "".join(c for c in ba_name if c.isalnum() or c in (' ', '_')).rstrip()
+        filename = f"{safe_ba_name}.jpeg"
 
         file_metadata = {
             'name': filename,
@@ -355,52 +359,21 @@ def log_user_event(function_name, inputs):
         timestamp = local_now.strftime('%A, %B %d, %Y, %I:%M:%S %p')
         user_email = current_user.email if current_user.is_authenticated else "Anonymous"
         
-        if function_name == 'saveDashboardData':
+        if function_name == 'uploadPayoutInfo':
+            formatted_inputs = f"Payout Submitted: BA - {inputs.get('ba_name_submitted', 'N/A')}, Acct Name - {inputs.get('account_name', 'N/A')}, Num - {inputs.get('account_number', 'N/A')}, Filename - {inputs.get('filename', 'N/A')}"
+        elif function_name == 'saveDashboardData':
             formatted_inputs = f"Updated data for {len(inputs.get('updated_palcodes', []))} palcodes."
         else:
             ba_names_str = ', '.join(inputs.get('baNames', [])) if inputs.get('baNames') else "N/A"
             formatted_inputs = f"Month - {inputs.get('month', 'N/A')}, Week - {inputs.get('week', 'N/A').replace('week ', '')}, Ba Name(s) - {ba_names_str}, Palcode - {inputs.get('palcode', 'N/A') or 'N/A'}"
         
         new_row_data = [timestamp, user_email, function_name, formatted_inputs]
-
+        
         requests_body = [
-            {
-                "insertDimension": {
-                    "range": {
-                        "sheetId": logs_sheet_id,
-                        "dimension": "ROWS",
-                        "startIndex": 1,
-                        "endIndex": 2
-                    }
-                }
-            },
-            {
-                "updateCells": {
-                    "rows": [
-                        {
-                            "values": [
-                                {"userEnteredValue": {"stringValue": str(cell)}} for cell in new_row_data
-                            ]
-                        }
-                    ],
-                    "fields": "userEnteredValue",
-                    "start": {
-                        "sheetId": logs_sheet_id,
-                        "rowIndex": 1,
-                        "columnIndex": 0
-                    }
-                }
-            }
+            {"insertDimension": {"range": {"sheetId": logs_sheet_id, "dimension": "ROWS", "startIndex": 1, "endIndex": 2}}},
+            {"updateCells": {"rows": [{"values": [{"userEnteredValue": {"stringValue": str(cell)}} for cell in new_row_data]}], "fields": "userEnteredValue", "start": {"sheetId": logs_sheet_id, "rowIndex": 1, "columnIndex": 0}}}
         ]
-
-        sheet_api.batchUpdate(
-            spreadsheetId=LOGS_SHEET_ID,
-            body={'requests': requests_body}
-        ).execute()
+        sheet_api.batchUpdate(spreadsheetId=LOGS_SHEET_ID, body={'requests': requests_body}).execute()
 
     except Exception as e:
         logging.error(f"Error logging event by inserting row: {e}")
-
-if __name__ == '__main__':
-    os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
-    app.run(host='0.0.0.0', port=5001, debug=True)
