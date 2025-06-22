@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchButton = document.getElementById('searchButton');
     const monthSelect = document.getElementById('monthSelect');
     const weekSelect = document.getElementById('weekSelect');
-    let baNameInput = document.getElementById('baNameInput');
+    const baNameInput = document.getElementById('baNameInput'); // For regular users
     const palcodeInput = document.getElementById('palcodeInput');
     const homeErrorMessage = document.getElementById('homeErrorMessage');
     const dashboardTabBtn = document.getElementById('dashboardTabBtn');
@@ -18,7 +18,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const dashboardDataDisplay = document.getElementById('dashboardDataDisplay');
     const dashboardSearchError = document.getElementById('dashboardSearchError');
     const darkModeToggleButton = document.getElementById('darkModeToggle');
-    const baNameSuggestions = document.getElementById('baNameSuggestions');
     const adminTabBtn = document.getElementById('adminTabBtn');
     const userManagementTableContainer = document.getElementById('userManagementTableContainer');
     const adminStatusMessage = document.getElementById('adminStatusMessage');
@@ -37,11 +36,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const payoutInfoFlipCard = document.getElementById('payoutInfoFlipCard');
     const payoutFrontInfo = document.getElementById('payoutFrontInfo');
     const payoutQrCodeContainer = document.getElementById('payoutQrCodeContainer');
+    // Dropdown Multi-Select Elements
+    const baNameSelectContainer = document.getElementById('baNameSelectContainer');
+    const baNameSelectButton = document.getElementById('baNameSelectButton');
+    const baNameDropdown = document.getElementById('baNameDropdown');
+    const baNameSearchInput = document.getElementById('baNameSearchInput');
+    const baNameCheckboxList = document.getElementById('baNameCheckboxList');
 
     // --- State Variables ---
     let isAdmin = false;
     let userPermissions = new Set();
-    let selectedBaNamesState = [];
     const statusOptions = ['PAID', 'DELAYED', 'UPDATING', 'INVALID', 'UNOFFICIAL'];
 
     // --- Initial Data Fetching & UI Setup ---
@@ -59,9 +63,13 @@ document.addEventListener('DOMContentLoaded', function() {
             adminTabBtn.style.display = 'block';
         }
 
-        const activeTabButton = document.querySelector('.tab-button.active');
-        if (userPermissions.has('MULTI_SELECT') && activeTabButton && activeTabButton.id === 'homeTabBtn') {
-            switchToMultiSelectView();
+        // PERMISSION CHECK: Decide which BA Name input to show
+        if (userPermissions.has('MULTI_SELECT') || userPermissions.has('SEARCH_ALL')) {
+            baNameSelectContainer.style.display = 'block';
+            baNameInput.style.display = 'none';
+        } else {
+            baNameSelectContainer.style.display = 'none';
+            baNameInput.style.display = 'block';
         }
     }
 
@@ -70,112 +78,74 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!response.ok) { throw new Error('Network response was not ok'); }
         return response.json();
     }).then(userInfo => {
-        if (userInfo) { setupUIForUser(userInfo); populateBaNameSuggestions(); }
-    }).catch(error => console.error("Initialization failed:", error));
-
-    function populateBaNameSuggestions() {
-        fetch('/api/ba-names').then(res => res.json()).then(names => {
-            if (baNameSuggestions && names && names.length > 0) {
-                baNameSuggestions.innerHTML = '';
-                names.forEach(name => {
-                    const option = document.createElement('option');
-                    option.value = name;
-                    baNameSuggestions.appendChild(option);
-                });
+        if (userInfo) {
+            setupUIForUser(userInfo);
+            // Only populate the dropdown if the user has permissions for it
+            if (userPermissions.has('MULTI_SELECT') || userPermissions.has('SEARCH_ALL')) {
+                populateBaNameDropdown();
             }
+        }
+    }).catch(error => console.error("Initialization failed:", error));
+    
+    // --- Custom Multi-Select Dropdown Logic ---
+    function populateBaNameDropdown() {
+        fetch('/api/ba-names').then(res => res.json()).then(names => {
+            baNameCheckboxList.innerHTML = '';
+            names.forEach(name => {
+                const label = document.createElement('label');
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = name;
+                checkbox.addEventListener('change', updateBaNameButtonText);
+                
+                label.appendChild(checkbox);
+                label.appendChild(document.createTextNode(` ${name}`));
+                baNameCheckboxList.appendChild(label);
+            });
         }).catch(err => console.error('Error fetching BA names:', err));
     }
 
-    // --- Special User UI Transformation Functions (Tag-based) ---
-    function switchToMultiSelectView() {
-        if (document.getElementById('baNameMultiSelectWrapper') || !userPermissions.has('MULTI_SELECT')) return;
-        const currentInput = document.getElementById('baNameInput');
-        const originalParent = currentInput.parentNode;
-        const wrapper = document.createElement('div');
-        wrapper.id = 'baNameMultiSelectWrapper';
-        wrapper.className = 'ba-input-wrapper-flex';
-        originalParent.replaceChild(wrapper, currentInput);
-        wrapper.appendChild(currentInput);
-        baNameInput = document.getElementById('baNameInput');
-        baNameInput.placeholder = 'TYPE BA NAME & PRESS ENTER, OR LEAVE BLANK FOR ALL';
-        baNameInput.value = '';
-        baNameInput.removeAttribute('list');
-        selectedBaNamesState.forEach(name => addTag(name, false));
-        updateVisibleTags();
-        baNameInput.addEventListener('keydown', handleMultiSelectKeyDown);
-        wrapper.addEventListener('click', () => baNameInput.focus());
-    }
-    function switchToSimpleView() {
-        if (!userPermissions.has('MULTI_SELECT')) return;
-        const wrapper = document.getElementById('baNameMultiSelectWrapper');
-        if (!wrapper) return;
-        const input = document.getElementById('baNameInput');
-        const parent = wrapper.parentNode;
-        parent.replaceChild(input, wrapper);
-        baNameInput = document.getElementById('baNameInput');
-        baNameInput.placeholder = 'ENTER BA NAME';
-        baNameInput.classList.remove('placeholder-hidden');
-        baNameInput.setAttribute('list', 'baNameSuggestions');
-        if (selectedBaNamesState.length === 1) {
-            baNameInput.value = selectedBaNamesState[0];
+    function updateBaNameButtonText() {
+        const checkedBoxes = baNameCheckboxList.querySelectorAll('input[type="checkbox"]:checked');
+        if (checkedBoxes.length === 0) {
+            baNameSelectButton.textContent = 'SELECT BA NAME';
+            baNameSelectButton.classList.remove('has-selection');
+        } else if (checkedBoxes.length === 1) {
+            baNameSelectButton.textContent = checkedBoxes[0].value;
+            baNameSelectButton.classList.add('has-selection');
         } else {
-            baNameInput.value = '';
+            baNameSelectButton.textContent = `${checkedBoxes.length} BAs SELECTED`;
+            baNameSelectButton.classList.add('has-selection');
         }
-        input.removeEventListener('keydown', handleMultiSelectKeyDown);
     }
-    function handleMultiSelectKeyDown(e) { if (e.key === 'Enter' && baNameInput.value.trim() !== '') { e.preventDefault(); addTag(baNameInput.value.trim(), true); baNameInput.value = ''; } }
-    function handleWrapperClick(e) { if (e.target.id === 'baNameMultiSelectWrapper') { baNameInput.focus(); } }
-    function updateVisibleTags() {
-        const wrapper = document.getElementById('baNameMultiSelectWrapper');
-        if (!wrapper) return;
-        const allNameTags = Array.from(wrapper.querySelectorAll('.ba-tag[data-name]'));
-        const existingCounter = wrapper.querySelector('.ba-tag-counter');
-        if (existingCounter) wrapper.removeChild(existingCounter);
-        allNameTags.forEach(tag => tag.style.display = 'none');
-        if (allNameTags.length > 0) {
-            const lastTag = allNameTags[allNameTags.length - 1];
-            lastTag.style.display = 'inline-flex';
-            if (allNameTags.length > 1) {
-                const counterTag = document.createElement('div');
-                counterTag.className = 'ba-tag ba-tag-counter';
-                counterTag.textContent = `+${allNameTags.length - 1}`;
-                counterTag.title = `${allNameTags.length - 1} more BA(s) selected`;
-                wrapper.insertBefore(counterTag, lastTag.nextSibling);
+
+    if (baNameSelectButton) {
+        baNameSelectButton.addEventListener('click', () => {
+            baNameDropdown.classList.toggle('show');
+        });
+    }
+
+    if (baNameSearchInput) {
+        baNameSearchInput.addEventListener('keyup', () => {
+            const filter = baNameSearchInput.value.toUpperCase();
+            const labels = baNameCheckboxList.getElementsByTagName('label');
+            for (let i = 0; i < labels.length; i++) {
+                const txtValue = labels[i].textContent || labels[i].innerText;
+                if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                    labels[i].style.display = "flex";
+                } else {
+                    labels[i].style.display = "none";
+                }
             }
-            baNameInput.classList.add('placeholder-hidden');
-        } else {
-            baNameInput.classList.remove('placeholder-hidden');
-        }
+        });
     }
-    function addTag(name, updateStateArray) {
-        if (updateStateArray) {
-            const lowerCaseName = name.toLowerCase();
-            if (selectedBaNamesState.map(n => n.toLowerCase()).includes(lowerCaseName)) return;
-            selectedBaNamesState.push(name);
+
+    window.addEventListener('click', function(e) {
+        if (baNameSelectContainer && !baNameSelectContainer.contains(e.target)) {
+            baNameDropdown.classList.remove('show');
         }
-        const wrapper = document.getElementById('baNameMultiSelectWrapper');
-        if (!wrapper) return;
-        const tag = document.createElement('div');
-        tag.className = 'ba-tag';
-        tag.setAttribute('data-name', name);
-        const tagName = document.createElement('span');
-        tagName.textContent = name;
-        tag.appendChild(tagName);
-        const removeBtn = document.createElement('span');
-        removeBtn.className = 'remove-tag';
-        removeBtn.innerHTML = '×';
-        removeBtn.title = `Remove ${name}`;
-        removeBtn.onclick = function(event) {
-            event.stopPropagation();
-            selectedBaNamesState = selectedBaNamesState.filter(n => n.toLowerCase() !== name.toLowerCase());
-            wrapper.removeChild(tag);
-            updateVisibleTags();
-        };
-        tag.appendChild(removeBtn);
-        wrapper.insertBefore(tag, baNameInput);
-        updateVisibleTags();
-    }
-    
+    });
+
     // --- UI MANAGEMENT (DARK MODE, TABS, WEEK 5) ---
     function setDarkMode(isDark) {
         if (isDark) {
@@ -197,17 +167,16 @@ document.addEventListener('DOMContentLoaded', function() {
     window.showTab = function(tabId, clickedButton) {
         document.querySelectorAll(".tab-content").forEach(tab => tab.classList.remove('active-content'));
         document.querySelectorAll(".tab-button").forEach(btn => btn.classList.remove("active"));
+        
         document.getElementById(tabId).classList.add('active-content');
         clickedButton.classList.add("active");
 
         if (tabId !== 'homeArea') {
             topLeftDynamicContent.appendChild(homeTitleContainer);
             topLeftDynamicContent.appendChild(homeSearchControlsContainer);
-            if (userPermissions.has('MULTI_SELECT')) switchToSimpleView();
         } else {
             homeContentCentered.appendChild(homeTitleContainer);
             homeContentCentered.appendChild(homeSearchControlsContainer);
-            if (userPermissions.has('MULTI_SELECT')) switchToMultiSelectView();
         }
 
         if (tabId === 'adminArea' && isAdmin) {
@@ -233,10 +202,10 @@ document.addEventListener('DOMContentLoaded', function() {
     handleMonthChange();
 
     if (searchButton) { searchButton.addEventListener('click', performSearch); }
-
+    
     // --- Admin Panel Functions ---
-    // ... (This entire section is correct and unchanged)
-
+    // ... (This section is correct and unchanged)
+    
     // --- Payout Form & Flip Card Logic ---
     function loadPayoutInfoCard() {
         fetch('/api/get_payout_info')
@@ -298,12 +267,10 @@ document.addEventListener('DOMContentLoaded', function() {
             uploadStatusMessage.textContent = 'Processing upload, please wait...';
             uploadStatusMessage.className = 'upload-status-message saving';
             const formData = new FormData(this);
-             // ====================== FIX IS HERE ======================
             fetch('/api/upload_payout_info', {
                 method: 'POST',
                 body: formData
             })
-            // =========================================================
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
@@ -331,18 +298,15 @@ document.addEventListener('DOMContentLoaded', function() {
     function performSearch() {
         const month = monthSelect.value, week = weekSelect.value, palcode = palcodeInput.value.trim();
         let baNamesToSearch = [];
-        const baNameInputValue = document.getElementById('baNameInput').value.trim();
-        if (userPermissions.has('MULTI_SELECT')) {
-            if (document.getElementById('baNameMultiSelectWrapper')) {
-                if (baNameInputValue !== '') { addTag(baNameInputValue, true); document.getElementById('baNameInput').value = ''; }
-                baNamesToSearch = selectedBaNamesState;
-            } else {
-                if(baNameInputValue) baNamesToSearch.push(baNameInputValue);
-            }
+        
+        if (userPermissions.has('MULTI_SELECT') || userPermissions.has('SEARCH_ALL')) {
+            const checkedBoxes = baNameCheckboxList.querySelectorAll('input[type="checkbox"]:checked');
+            checkedBoxes.forEach(checkbox => baNamesToSearch.push(checkbox.value));
         } else {
-             if(baNameInputValue) baNamesToSearch.push(baNameInputValue);
+            const baNameValue = baNameInput.value.trim();
+            if (baNameValue) baNamesToSearch.push(baNameValue);
         }
-
+        
         const errorTarget = document.getElementById('homeErrorMessage'); 
         errorTarget.textContent = ''; 
         let missingFields = [];
@@ -364,11 +328,9 @@ document.addEventListener('DOMContentLoaded', function() {
         dashboardSearchError.style.display = 'none'; 
         loadingIndicator.style.display = 'flex';
         const searchPayload = { month: month, week: week, baNames: baNamesToSearch, palcode: palcode };
-        // ====================== FIX IS HERE ======================
         fetch('/api/search', {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(searchPayload),
         })
-        // =========================================================
         .then(res => {
             if (res.status === 401) { window.location.href = '/login'; return Promise.reject('Session expired'); }
             if (!res.ok) { return res.json().then(errData => { throw new Error(errData.error || `Server error: ${res.status}`); }); }
@@ -389,7 +351,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (hasData) {
             dashboardSearchError.style.display = 'none'; 
             populateDashboardWithData(data); 
-            loadPayoutInfoCard();
+            if (userPermissions.has('VIEW_PAYOUT_CARD')) {
+                loadPayoutInfoCard();
+            }
             dashboardDataDisplay.style.display = 'flex';
         } else {
             dashboardSearchError.querySelector('p').textContent = `⚠️ ${data.message || 'No data found for this query.'}`;
