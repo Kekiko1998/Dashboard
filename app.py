@@ -494,7 +494,7 @@ def upload_payout_info():
         logging.error(f"Error during file upload for user {current_user.email}: {e}")
         return jsonify({"success": False, "error": f"An unexpected error occurred during upload: {e}"}), 500
 
-# ================== LOGGING FUNCTIONS RESTORED ==================
+# Logging Function
 SHEET_ID_CACHE = {}
 def _get_sheet_id_by_name(spreadsheet_id, sheet_name):
     if spreadsheet_id in SHEET_ID_CACHE and sheet_name in SHEET_ID_CACHE[spreadsheet_id]:
@@ -545,7 +545,6 @@ def log_user_event(function_name, inputs):
         sheet_api.batchUpdate(spreadsheetId=LOGS_SHEET_ID, body={'requests': requests_body}).execute()
     except Exception as e:
         logging.error(f"Error logging event by inserting row: {e}")
-# =============================================================
 
 if __name__ == '__main__':
     os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
