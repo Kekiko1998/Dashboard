@@ -18,10 +18,11 @@
         <div class="tabs">
             <button id="homeTabBtn" class="tab-button active" onclick="showTab('homeArea', this)">Home</button>
             <button id="dashboardTabBtn" class="tab-button" onclick="showTab('dashboardDisplayArea', this)">Dashboard</button>
+            <!-- ================== NEW PAYOUT TAB ================== -->
+            <button id="payoutTabBtn" class="tab-button" onclick="showTab('payoutArea', this)">Payout Info</button>
+            <!-- ==================================================== -->
             <button id="salaryTabBtn" class="tab-button" onclick="showTab('salarySchemeArea', this)">Salary Scheme</button>
-            <!-- ================== NEW ADMIN TAB (hidden by default) ================== -->
             <button id="adminTabBtn" class="tab-button" onclick="showTab('adminArea', this)" style="display: none;">Admin</button>
-            <!-- ======================================================================= -->
         </div>
         <div id="userInfo" class="user-info" style="display: none;">
             <span id="userName" class="user-name"></span>
@@ -41,39 +42,40 @@
                     <span class="home-subtitle">By Love</span>
                 </div>
                 <div id="homeSearchControlsContainer" class="home-search-controls-container">
-                    <!-- Inside #homeArea -> .home-search-controls-container -> .home-search-controls -->
-<div class="home-search-controls">
-    <select id="monthSelect">
-        <option value="" disabled selected>SELECT MONTH</option>
-        <option value="January">January</option><option value="February">February</option><option value="March">March</option><option value="April">April</option><option value="May">May</option><option value="June">June</option><option value="July">July</option><option value="August">August</option><option value="September">September</option><option value="October">October</option><option value="November">November</option><option value="December">December</option>
-    </select>
-    <select id="weekSelect">
-        <option value="" disabled selected>SELECT WEEK</option>
-        <option value="Week 1">Week 1</option>
-        <option value="Week 2">Week 2</option>
-        <option value="Week 3">Week 3</option>
-        <option value="Week 4">Week 4</option>
-        <option id="week5Option" value="Week 5">Week 5</option>
-    </select>
-    
-    <!-- ================== NEW MULTI-SELECT DROPDOWN SYSTEM ================== -->
-    <div id="baNameSelectContainer" class="ba-name-select-container">
-        <button id="baNameSelectButton" class="ba-name-select-button">SELECT BA NAME</button>
-        <div id="baNameDropdown" class="ba-name-dropdown">
-            <input type="text" id="baNameSearchInput" placeholder="Search names...">
-            <div id="baNameCheckboxList" class="ba-name-checkbox-list">
-                <!-- Checkboxes will be inserted here by JavaScript -->
+                    <div class="home-search-controls">
+                        <select id="monthSelect">
+                            <option value="" disabled selected>SELECT MONTH</option>
+                            <option value="January">January</option><option value="February">February</option><option value="March">March</option><option value="April">April</option><option value="May">May</option><option value="June">June</option><option value="July">July</option><option value="August">August</option><option value="September">September</option><option value="October">October</option><option value="November">November</option><option value="December">December</option>
+                        </select>
+                        <select id="weekSelect">
+                            <option value="" disabled selected>SELECT WEEK</option>
+                            <option value="Week 1">Week 1</option>
+                            <option value="Week 2">Week 2</option>
+                            <option value="Week 3">Week 3</option>
+                            <option value="Week 4">Week 4</option>
+                            <option id="week5Option" value="Week 5">Week 5</option>
+                        </select>
+                        
+                        <!-- Multi-Select Dropdown System -->
+                        <div id="baNameSelectContainer" class="ba-name-select-container" style="display: none;">
+                            <button id="baNameSelectButton" class="ba-name-select-button">SELECT BA NAME</button>
+                            <div id="baNameDropdown" class="ba-name-dropdown">
+                                <input type="text" id="baNameSearchInput" placeholder="Search names...">
+                                <div id="baNameCheckboxList" class="ba-name-checkbox-list"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Original Input for regular users -->
+                        <input type="text" id="baNameInput" placeholder="ENTER BA NAME" autocomplete="off" list="baNameSuggestions">
+                        <datalist id="baNameSuggestions"></datalist>
+                        
+                        <input type="text" id="palcodeInput" placeholder="ENTER PALCODE (OPTIONAL)">
+                        <button id="searchButton" class="search-button">SEARCH</button>
+                    </div>
+                    <div id="homeErrorMessage" class="error-message-main"></div>
+                </div>
             </div>
         </div>
-    </div>
-    <!-- ==================================================================== -->
-    
-    <input type="text" id="baNameInput" placeholder="ENTER BA NAME" autocomplete="off" list="baNameSuggestions" style="display: none;">
-    <datalist id="baNameSuggestions"></datalist>
-    
-    <input type="text" id="palcodeInput" placeholder="ENTER PALCODE (OPTIONAL)">
-    <button id="searchButton" class="search-button">SEARCH</button>
-</div>
 
         <!-- DASHBOARD TAB CONTENT -->
         <div id="dashboardDisplayArea" class="tab-content">
@@ -123,59 +125,7 @@
             </div>
         </div>
 
-        <!-- SALARY SCHEME TAB CONTENT -->
-        <div id="salarySchemeArea" class="tab-content">
-            <h1 class="ba-payout-header">BA PAYOUT SCHEME</h1>
-            <div class="salary-scheme-table-container">
-                <table>
-                    <thead><tr><th>GGR per FD</th><th>Standard FD Rate</th><th>Weekly FD</th><th>Total Payout</th></tr></thead>
-                    <tbody>
-                         <tr><td>BELOW ₱99</td><td>₱ 25.00</td><td>100</td><td>₱ 2,500.00</td></tr>
-                         <tr><td>₱100 - ₱149</td><td>₱ 60.00</td><td>100</td><td>₱ 6,000.00</td></tr>
-                         <tr><td>₱150 - ₱499</td><td>₱ 90.00</td><td>100</td><td>₱ 9,000.00</td></tr>
-                         <tr><td>₱500 - ₱999</td><td>₱ 140.00</td><td>100</td><td>₱ 14,000.00</td></tr>
-                         <tr><td>₱1,000 - ₱1,499</td><td>₱ 230.00</td><td>100</td><td>₱ 23,000.00</td></tr>
-                         <tr><td>₱1,500 - ₱1,999</td><td>₱ 325.00</td><td>100</td><td>₱ 32,500.00</td></tr>
-                         <tr><td>₱2,000 AND ABOVE</td><td>₱ 420.00</td><td>100</td><td>₱ 42,000.00</td></tr>
-                    </tbody>
-                </table>
-            </div>
-            <div class="salary-notes">
-                <h3>NOTES:</h3>
-                <ul>
-                     <li><strong>GGR Cutoff:</strong> Monday to Sunday (Weekly)</li>
-                     <li>The current day GGR file will be sent the next day, but the final GGR for the whole payout week will come from the data team after their verification, as this might still increase the GGR of each parent code.</li>
-                     <li>The payout scheme is subject to change at the sole discretion of the company in the event that any abusive acts executed by the brand ambassadors are identified.</li>
-                     <li><strong>0 Reg = 0 FD</strong></li>
-                     <li>FDs with an amount below 100 pesos are disqualified.</li><li> Suspended accounts wil be deducted from weekly payout to ensure that no FAKE accounts were paid to BAs</li>
-                </ul>
-            </div>
-        </div>
- 
-        div class="tabs">
-    <button id="homeTabBtn" class="tab-button active" onclick="showTab('homeArea', this)">Home</button>
-    <button id="dashboardTabBtn" class="tab-button" onclick="showTab('dashboardDisplayArea', this)">Dashboard</button>
-    <button id="salaryTabBtn" class="tab-button" onclick="showTab('salarySchemeArea', this)">Salary Scheme</button>
-    <!-- ================== NEW PAYOUT TAB ================== -->
-    <button id="payoutTabBtn" class="tab-button" onclick="showTab('payoutArea', this)">Payout</button>
-    <!-- ==================================================== -->
-    <button id="adminTabBtn" class="tab-button" onclick="showTab('adminArea', this)" style="display: none;">Admin</button>
-</div>
-
-
-        <!-- ================== NEW ADMIN AREA CONTENT ================== -->
-        <div id="adminArea" class="tab-content">
-            <div class="admin-panel-container">
-                <h1>User Management</h1>
-                <p>Grant or revoke specific permissions for users. Admins have all permissions by default and cannot be changed.</p>
-                <div id="adminStatusMessage" class="admin-status-message"></div>
-                <div id="userManagementTableContainer">
-                    <div class="loading-indicator">⏳ Loading users...</div>
-                </div>
-            </div>
-        </div>
-        <!-- ========================================================== -->
-         <!-- ================== NEW PAYOUT AREA CONTENT ================== -->
+        <!-- NEW PAYOUT AREA CONTENT -->
         <div id="payoutArea" class="tab-content">
             <div class="payout-panel-container">
                 <h1>Submit Payout Information</h1>
@@ -214,7 +164,48 @@
                 <div id="uploadStatusMessage" class="upload-status-message"></div>
             </div>
         </div>
-        <!-- =============================================================== -->
+        
+        <!-- SALARY SCHEME TAB CONTENT -->
+        <div id="salarySchemeArea" class="tab-content">
+            <h1 class="ba-payout-header">BA PAYOUT SCHEME</h1>
+            <div class="salary-scheme-table-container">
+                <table>
+                    <thead><tr><th>GGR per FD</th><th>Standard FD Rate</th><th>Weekly FD</th><th>Total Payout</th></tr></thead>
+                    <tbody>
+                         <tr><td>BELOW ₱99</td><td>₱ 25.00</td><td>100</td><td>₱ 2,500.00</td></tr>
+                         <tr><td>₱100 - ₱149</td><td>₱ 60.00</td><td>100</td><td>₱ 6,000.00</td></tr>
+                         <tr><td>₱150 - ₱499</td><td>₱ 90.00</td><td>100</td><td>₱ 9,000.00</td></tr>
+                         <tr><td>₱500 - ₱999</td><td>₱ 140.00</td><td>100</td><td>₱ 14,000.00</td></tr>
+                         <tr><td>₱1,000 - ₱1,499</td><td>₱ 230.00</td><td>100</td><td>₱ 23,000.00</td></tr>
+                         <tr><td>₱1,500 - ₱1,999</td><td>₱ 325.00</td><td>100</td><td>₱ 32,500.00</td></tr>
+                         <tr><td>₱2,000 AND ABOVE</td><td>₱ 420.00</td><td>100</td><td>₱ 42,000.00</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="salary-notes">
+                <h3>NOTES:</h3>
+                <ul>
+                     <li><strong>GGR Cutoff:</strong> Monday to Sunday (Weekly)</li>
+                     <li>The current day GGR file will be sent the next day, but the final GGR for the whole payout week will come from the data team after their verification, as this might still increase the GGR of each parent code.</li>
+                     <li>The payout scheme is subject to change at the sole discretion of the company in the event that any abusive acts executed by the brand ambassadors are identified.</li>
+                     <li><strong>0 Reg = 0 FD</strong></li>
+                     <li>FDs with an amount below 100 pesos are disqualified.</li><li> Suspended accounts wil be deducted from weekly payout to ensure that no FAKE accounts were paid to BAs</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- ADMIN AREA CONTENT -->
+        <div id="adminArea" class="tab-content">
+            <div class="admin-panel-container">
+                <h1>User Management</h1>
+                <p>Grant or revoke specific permissions for users. Admins have all permissions by default and cannot be changed.</p>
+                <div id="adminStatusMessage" class="admin-status-message"></div>
+                <div id="userManagementTableContainer">
+                    <div class="loading-indicator">⏳ Loading users...</div>
+                </div>
+            </div>
+        </div>
+
     </div>
   </div>
   <div id="globalErrorMessage" class="error-message-main" style="padding: 10px; text-align: center; display:none;"></div>

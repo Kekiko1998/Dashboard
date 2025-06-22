@@ -44,10 +44,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function setupUIForUser(userInfo) {
         isAdmin = userInfo.isAdmin;
         userPermissions = new Set(userInfo.permissions);
-        if (payoutBaNameInput) {
-            payoutBaNameInput.value = userInfo.name || '';
-        }
-    
+
         userNameSpan.textContent = userInfo.name;
         userInfoDiv.style.display = 'flex';
 
@@ -339,7 +336,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
- // ================== NEW PAYOUT FORM LOGIC ==================
+    // ================== NEW PAYOUT FORM LOGIC ==================
     if (payoutImageInput) {
         payoutImageInput.addEventListener('change', function() {
             uploadStatusMessage.textContent = ''; // Clear previous status
@@ -409,7 +406,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     // ===========================================================
+    
     // --- Search & Data Handling ---
+    // ... (The rest of the script is unchanged and correct)
     function performSearch() {
         const month = monthSelect.value, week = weekSelect.value, palcode = palcodeInput.value.trim();
         let baNamesToSearch;
