@@ -5,11 +5,12 @@ from flask import Flask, jsonify, render_template, request, redirect, url_for, s
 from flask_login import LoginManager, current_user, login_required, login_user, logout_user, UserMixin
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload # <-- NEW IMPORT
 from google_auth_oauthlib.flow import Flow
 import logging
 import requests
 import pytz
-
+import io # <-- NEW IMPORT
 # --- Basic Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -19,6 +20,9 @@ DATABASE_SHEET_NAME = 'DATABASE'
 LOGS_SHEET_ID = '1ZufXPOUcoW2czQ0vcpZwvJNHngV4GHbbSl9q46UwF8g'
 LOGS_SHEET_NAME = 'Web App Logs'
 USERS_SHEET_NAME = 'Users'
+# ================== NEW GOOGLE DRIVE CONFIG ==================
+DRIVE_FOLDER_ID = '1qwCPheAuWIRG8PHK9j8PRz3vNNpJ3KHM' # <-- PASTE YOUR FOLDER ID HERE
+# =============================================================
 # Root admins have hardcoded admin rights and cannot be changed via the UI.
 ADMIN_USER_EMAILS = ['harrypobreza@gmail.com'] 
 # Define all controllable features here
@@ -56,7 +60,10 @@ def load_user(user_id):
 # --- Google API Setup ---
 CLIENT_SECRET_FILE = 'client_secret.json'
 SCOPES_OAUTH = ['https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email', 'openid']
-SCOPES_SERVICE_ACCOUNT = ['https://www.googleapis.com/auth/spreadsheets']
+SCOPES_SERVICE_ACCOUNT = [
+    'https://www.googleapis.com/auth/spreadsheets',
+    'https://www.googleapis.com/auth/drive' # <-- ADD THIS LINE
+]
 creds_service_account = None
 try:
     if 'GOOGLE_CREDENTIALS_JSON' in os.environ:
@@ -387,6 +394,68 @@ def save_dashboard():
     except Exception as e:
         logging.error(f"Error saving dashboard data: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+
+# ================== NEW API ENDPOINT FOR FILE UPLOAD ==================
+@app.route('/api/upload_payout_info', methods=['POST'])
+@login_required
+def upload_payout_info():
+    # Check for required form fields
+    if 'mopAccountName' not in request.form or 'mopNumber' not in request.form:
+        return jsonify({"success": False, "error": "Missing account name or number."}), 400
+    
+    if 'payoutImage' not in request.files:
+        return jsonify({"success": False, "error": "No image file was uploaded."}), 400
+
+    mop_account_name = request.form['mopAccountName']
+    mop_number = request.form['mopNumber']
+    image_file = request.files['payoutImage']
+
+    if image_file.filename == '':
+        return jsonify({"success": False, "error": "No selected file."}), 400
+
+    try:
+        # Build the Google Drive service
+        drive_service = build('drive', 'v3', credentials=creds_service_account)
+
+        # Get the current user's BA Name from the DATABASE sheet
+        # This assumes the user's name in the app matches a BA NAME in the sheet.
+        # A more robust system might use a dedicated BA NAME field in the Users sheet.
+        user_name = current_user.name
+        
+        # Define the new filename
+        filename = f"{user_name}.jpeg"
+
+        # Create the file metadata
+        file_metadata = {
+            'name': filename,
+            'parents': [DRIVE_FOLDER_ID]
+        }
+
+        # Read the file into memory
+        media = MediaIoBaseUpload(io.BytesIO(image_file.read()),
+                                  mimetype='image/jpeg',
+                                  resumable=True)
+        
+        # Upload the file
+        file = drive_service.files().create(body=file_metadata,
+                                            media_body=media,
+                                            fields='id').execute()
+        
+        logging.info(f"User {current_user.email} uploaded file '{filename}' with ID: {file.get('id')}")
+
+        # You can optionally save the MOP Account Name and Number to the Users sheet here
+        # For now, we'll just confirm the upload was successful.
+
+        return jsonify({"success": True, "message": "Payout information and image uploaded successfully!"})
+
+    except Exception as e:
+        logging.error(f"Error during file upload for user {current_user.email}: {e}")
+        return jsonify({"success": False, "error": f"An unexpected error occurred during upload: {e}"}), 500
+# ========================================================================
+
+
 
 # Logging Function
 SHEET_ID_CACHE = {}

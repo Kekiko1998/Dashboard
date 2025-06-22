@@ -25,6 +25,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const tableControls = document.getElementById('tableControls');
     const saveButton = document.getElementById('saveButton');
     const saveStatusMessage = document.getElementById('saveStatusMessage');
+   // ================== NEW PAYOUT FORM ELEMENTS ==================
+    const payoutForm = document.getElementById('payoutForm');
+    const uploadButton = document.getElementById('uploadButton');
+    const uploadStatusMessage = document.getElementById('uploadStatusMessage');
+    const payoutImageInput = document.getElementById('payoutImage');
+    const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+    const imagePreview = document.getElementById('imagePreview');
+    // ============================================================
 
     // --- State Variables ---
     let isAdmin = false;
@@ -36,7 +44,10 @@ document.addEventListener('DOMContentLoaded', function() {
     function setupUIForUser(userInfo) {
         isAdmin = userInfo.isAdmin;
         userPermissions = new Set(userInfo.permissions);
-
+        if (payoutBaNameInput) {
+            payoutBaNameInput.value = userInfo.name || '';
+        }
+    
         userNameSpan.textContent = userInfo.name;
         userInfoDiv.style.display = 'flex';
 
@@ -328,6 +339,76 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+ // ================== NEW PAYOUT FORM LOGIC ==================
+    if (payoutImageInput) {
+        payoutImageInput.addEventListener('change', function() {
+            uploadStatusMessage.textContent = ''; // Clear previous status
+            const file = this.files[0];
+            if (file) {
+                // Client-side validation
+                if (file.size > 5 * 1024 * 1024) { // 5MB limit
+                    alert('Error: File size exceeds 5MB limit.');
+                    this.value = ''; // Reset file input
+                    imagePreviewContainer.style.display = 'none';
+                    return;
+                }
+                if (!['image/jpeg', 'image/png'].includes(file.type)) {
+                    alert('Error: Only JPEG and PNG files are allowed.');
+                    this.value = ''; // Reset file input
+                    imagePreviewContainer.style.display = 'none';
+                    return;
+                }
+
+                // Show image preview
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    imagePreview.src = e.target.result;
+                    imagePreviewContainer.style.display = 'block';
+                }
+                reader.readAsDataURL(file);
+            } else {
+                imagePreviewContainer.style.display = 'none';
+            }
+        });
+    }
+
+    if (payoutForm) {
+        payoutForm.addEventListener('submit', function(e) {
+            e.preventDefault(); // Prevent default form submission
+
+            uploadButton.disabled = true;
+            uploadButton.textContent = 'UPLOADING...';
+            uploadStatusMessage.textContent = 'Processing upload, please wait...';
+            uploadStatusMessage.className = 'upload-status-message saving';
+
+            const formData = new FormData(this);
+
+            fetch('/api/upload_payout_info', {
+                method: 'POST',
+                body: formData // Send form data directly
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    uploadStatusMessage.textContent = data.message;
+                    uploadStatusMessage.className = 'upload-status-message success';
+                    payoutForm.reset(); // Clear the form
+                    imagePreviewContainer.style.display = 'none';
+                } else {
+                    throw new Error(data.error);
+                }
+            })
+            .catch(error => {
+                uploadStatusMessage.textContent = `Error: ${error.message}`;
+                uploadStatusMessage.className = 'upload-status-message error';
+            })
+            .finally(() => {
+                uploadButton.disabled = false;
+                uploadButton.textContent = 'Upload Information';
+            });
+        });
+    }
+    // ===========================================================
     // --- Search & Data Handling ---
     function performSearch() {
         const month = monthSelect.value, week = weekSelect.value, palcode = palcodeInput.value.trim();

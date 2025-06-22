@@ -428,4 +428,131 @@ input:checked + .slider:before {
 
 .slider.round:before {
   border-radius: 50%;
+}/* ADD THESE NEW RULES TO THE END OF YOUR STYLE.CSS FILE */
+
+/* --- Payout Info Tab Styles --- */
+#payoutArea {
+    justify-content: flex-start;
+    align-items: center;
+    padding: 20px 30px;
 }
+
+.payout-panel-container {
+    width: 100%;
+    max-width: 600px;
+    font-family: var(--roboto-font);
+    background-color: var(--panel-bg);
+    padding: 20px 30px;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.payout-panel-container h1 {
+    font-family: var(--bebas-font);
+    font-size: 2.5rem;
+    color: var(--text-color-main);
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.payout-panel-container p {
+    text-align: center;
+    color: var(--text-color-subtle);
+    margin-bottom: 25px;
+}
+
+.upload-warnings {
+    background-color: rgba(255, 193, 7, 0.1);
+    border-left: 4px solid #ffc107;
+    padding: 15px;
+    margin-bottom: 25px;
+    border-radius: 4px;
+}
+
+.upload-warnings h4 {
+    margin-top: 0;
+    color: #ffc107;
+}
+
+.upload-warnings ul {
+    padding-left: 20px;
+    margin: 0;
+    font-size: 0.9em;
+    color: var(--text-color-subtle);
+}
+
+.payout-form .form-group {
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+.payout-form label {
+    margin-bottom: 8px;
+    font-weight: bold;
+    font-size: 0.9em;
+}
+
+.payout-form input[type="text"],
+.payout-form input[type="file"] {
+    width: 100%;
+    padding: 10px;
+    box-sizing: border-box;
+    border: 1px solid var(--input-border-color);
+    border-radius: 3px;
+    background-color: var(--input-bg);
+    color: var(--input-text);
+}
+
+.payout-form input[type="file"] {
+    padding: 7px;
+}
+
+.image-preview-container {
+    text-align: center;
+    margin-top: 15px;
+    margin-bottom: 15px;
+    padding: 10px;
+    border: 1px dashed var(--input-border-color);
+    border-radius: 4px;
+}
+
+.image-preview-container img {
+    max-width: 100%;
+    max-height: 200px;
+    height: auto;
+}
+
+.upload-button {
+    width: 100%;
+    padding: 12px;
+    font-family: var(--bebas-font);
+    font-size: 1.2rem;
+    letter-spacing: 1px;
+    border: none;
+    border-radius: 3px;
+    background-color: var(--primary-blue);
+    color: var(--header-text-color);
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.upload-button:hover {
+    background-color: var(--primary-blue-darker);
+}
+
+.upload-button:disabled {
+    background-color: #5a6268;
+    cursor: not-allowed;
+}
+
+.upload-status-message {
+    text-align: center;
+    font-weight: bold;
+    min-height: 20px;
+    margin-top: 15px;
+}
+
+.upload-status-message.saving { color: #ffc107; }
+.upload-status-message.success { color: #28a745; }
+.upload-status-message.error { color: var(--error-color); }
