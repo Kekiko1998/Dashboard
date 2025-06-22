@@ -77,52 +77,53 @@
         </div>
 
         <!-- DASHBOARD TAB CONTENT -->
-        <div id="dashboardDisplayArea" class="tab-content">
-            <div id="dashboardPlaceholder" class="dashboard-placeholder-message">
-                <p> 🔎 Please perform a search to view dashboard data.</p>
-            </div>
-            <div id="loadingIndicator" class="loading-indicator" style="display: none;">
-                ⏳ Fetching dashboard data, please wait...
-            </div>
-            <div id="dashboardSearchError" class="dashboard-placeholder-message" style="display: none; color: orange;">
-                <p>⚠️ No data found for the selected criteria, or the search parameters were insufficient.</p>
-            </div>
-            <div id="dashboardDataDisplay" class="dashboard-content-area" style="display: none;">
-              <div class="left-panel">
-                <div id="baNameDisplay" class="ba-name-display"></div>
-                <div class="summary-section"><h4>SUMMARY</h4></div>
-                <div class="summary-cards-container">
-                    <div class="summary-card"><span class="summary-label">TOTAL REG</span><span class="summary-value" id="totalRegistrationValue">0</span></div>
-                    <div class="summary-card"><span class="summary-label">TOTAL VALID FD</span><span class="summary-value" id="totalValidFdValue">0</span></div>
-                    <div class="summary-card"><span class="summary-label">TOTAL SUSPENDED</span><span class="summary-value" id="totalSuspendedValue">0</span></div>
-                    <div class="summary-card"><span class="summary-label">TOTAL SALARY</span><span class="summary-value" id="totalSalaryValue">0</span></div>
-                    <div class="summary-card"><span class="summary-label">INCENTIVES</span><span class="summary-value" id="totalIncentiveValue">₱0.00</span></div>
-                    <div id="commissionCard" class="summary-card" style="display: none;"><span class="summary-label">COMMISSION</span><span class="summary-value" id="totalCommissionValue">0</span></div>
-                </div>
-                <div class="filter-display">
-                    <span id="monthDisplay">MONTH</span>
-                    <span id="weekDisplay">WEEK</span>
-                </div>
-                <div id="dateRangeDisplay" class="date-range-display"></div>
-                <div class="status-display">STATUS: <span id="statusValue">N/A</span></div>
-                        <!-- ================== BA RANKING SECTION MOVED BACK HERE ================== -->
-                <div class="ba-ranking-section">
-                    <h4>TOP BA RANKING (VALID FD)</h4>
-                    <div id="baRankingList" class="ba-ranking-list"></div>
-                       </div>
-                     <!-- ====================================================================== -->
-
-              </div>
-              <div class="right-panel">
-                <div id="tableControls" class="table-controls" style="display: none;">
-                    <button id="saveButton" class="save-button">Save Changes</button>
-                    <span id="saveStatusMessage"></span>
-                </div>
-                <div id="resultsTableContainer" class="results-table-container"></div>
-                <div class="last-update-display">LAST UPDATE: <span id="lastUpdateValue">N/A</span></div>
-              </div>
-            </div>
+<div id="dashboardDisplayArea" class="tab-content">
+    <div id="dashboardPlaceholder" class="dashboard-placeholder-message">
+        <p> 🔎 Please perform a search to view dashboard data.</p>
+    </div>
+    <div id="loadingIndicator" class="loading-indicator" style="display: none;">
+        ⏳ Fetching dashboard data, please wait...
+    </div>
+    <div id="dashboardSearchError" class="dashboard-placeholder-message" style="display: none; color: orange;">
+        <p>⚠️ No data found for the selected criteria, or the search parameters were insufficient.</p>
+    </div>
+    <div id="dashboardDataDisplay" class="dashboard-content-area" style="display: none;">
+      <div class="left-panel">
+        <div id="baNameDisplay" class="ba-name-display"></div>
+        <div class="summary-section"><h4>SUMMARY</h4></div>
+        <div class="summary-cards-container">
+          <div class="summary-card"><span class="summary-label">TOTAL REG</span><span class="summary-value" id="totalRegistrationValue">0</span></div>
+          <div class="summary-card"><span class="summary-label">TOTAL VALID FD</span><span class="summary-value" id="totalValidFdValue">0</span></div>
+          <div class="summary-card"><span class="summary-label">TOTAL SUSPENDED</span><span class="summary-value" id="totalSuspendedValue">0</span></div>
+          <div class="summary-card"><span class="summary-label">TOTAL SALARY</span><span class="summary-value" id="totalSalaryValue">0</span></div>
+          <div class="summary-card"><span class="summary-label">INCENTIVES</span><span class="summary-value" id="totalIncentiveValue">₱0.00</span></div>
+          <div id="commissionCard" class="summary-card" style="display: none;"><span class="summary-label">COMMISSION</span><span class="summary-value" id="totalCommissionValue">0</span></div>
         </div>
+        <div class="filter-display">
+          <span id="monthDisplay">MONTH</span>
+          <span id="weekDisplay">WEEK</span>
+        </div>
+        <div id="dateRangeDisplay" class="date-range-display"></div>
+        <div class="status-display">STATUS: <span id="statusValue">N/A</span></div>
+        
+        <!-- ================== BA RANKING SECTION MOVED BACK HERE ================== -->
+        <div class="ba-ranking-section">
+          <h4>TOP BA RANKING (VALID FD)</h4>
+          <div id="baRankingList" class="ba-ranking-list"></div>
+        </div>
+        <!-- ====================================================================== -->
+        
+      </div>
+      <div class="right-panel">
+        <div id="tableControls" class="table-controls" style="display: none;">
+            <button id="saveButton" class="save-button">Save Changes</button>
+            <span id="saveStatusMessage"></span>
+        </div>
+        <div id="resultsTableContainer" class="results-table-container"></div>
+        <div class="last-update-display">LAST UPDATE: <span id="lastUpdateValue">N/A</span></div>
+      </div>
+    </div>
+</div>
         
         <!-- NEW TAB FOR VIEWING PAYOUT INFO -->
         <div id="myPayoutArea" class="tab-content">
