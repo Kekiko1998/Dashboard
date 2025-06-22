@@ -361,6 +361,34 @@ document.addEventListener('DOMContentLoaded', function() {
             dashboardDataDisplay.style.display = 'none';
         }
     }
+    
+    function handleSearchFailure(error) {
+        if (error.message.includes('Session expired')) { console.log("Session expired, redirecting..."); return; }
+        searchButton.disabled = false; searchButton.textContent = 'SEARCH'; loadingIndicator.style.display = 'none';
+        dashboardSearchError.querySelector('p').textContent = `❌ Script Error: ${error.message || 'Unknown error.'}`;
+        dashboardSearchError.style.display = 'flex'; dashboardDataDisplay.style.display = 'none';
+        console.error("Server Call Error:", error);
+    }
+
+    function determineSummaryStatus(tableData) {
+        const statusColumnIndex = 11;
+        if (!tableData || tableData.length === 0) return { text: 'N/A', class: '' };
+        const statuses = new Set(tableData.map(row => row[statusColumnIndex]?.toString().trim().toLowerCase()).filter(Boolean));
+        if (statuses.size === 0) return { text: 'N/A', class: '' };
+        if (statuses.size === 1) {
+            const singleStatus = statuses.values().next().value; const formattedText = singleStatus.replace(/-/g, ' ').toUpperCase();
+            return { text: formattedText, class: `status-${singleStatus.replace(/\s+/g, '-')}` };
+        }
+        const priority = ['delayed', 'on-going', 'updating', 'paid', 'invalid', 'unofficial'];
+        for (const p of priority) {
+            if (statuses.has(p)) {
+                const formattedText = p.replace(/-/g, ' ').toUpperCase();
+                return { text: formattedText, class: `status-${p.replace(/\s+/g, '-')}` };
+            }
+        }
+        return { text: 'MIXED', class: '' };
+    }
+    
     function populateDashboardWithData(data) {
         const baNameDisplay = document.getElementById('baNameDisplay'), totalRegistrationValue = document.getElementById('totalRegistrationValue'), totalValidFdValue = document.getElementById('totalValidFdValue'), totalSuspendedValue = document.getElementById('totalSuspendedValue'), totalSalaryValue = document.getElementById('totalSalaryValue'), totalIncentiveValue = document.getElementById('totalIncentiveValue'), monthDisplay = document.getElementById('monthDisplay'), weekDisplay = document.getElementById('weekDisplay'), dateRangeDisplay = document.getElementById('dateRangeDisplay'), statusValue = document.getElementById('statusValue'), lastUpdateValue = document.getElementById('lastUpdateValue'), baRankingListDiv = document.getElementById('baRankingList'), resultsTableContainer = document.getElementById('resultsTableContainer');
         const commissionCard = document.getElementById('commissionCard');
@@ -375,7 +403,7 @@ document.addEventListener('DOMContentLoaded', function() {
             baNameDisplay.className = 'ba-name-display'; 
             const selectedNames = data.searchCriteria?.baNames || [];
             
-            if (selectedNames.length > 1 && userPermissions.has('MULTI_SELECT')) {
+            if (selectedNames.length > 1 && (userPermissions.has('MULTI_SELECT') || userPermissions.has('SEARCH_ALL'))) {
                 const namesContainer = document.createElement('div');
                 namesContainer.className = 'ba-name-scroll-content';
                 const appendNames = () => {
