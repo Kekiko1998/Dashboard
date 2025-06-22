@@ -33,8 +33,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const imagePreview = document.getElementById('imagePreview');
     const payoutBaNameInput = document.getElementById('payoutBaName');
     // Flip Card Elements
-    const payoutInfoFlipCard = document.getElementById('payoutInfoFlipCard');
-    const payoutFrontInfo = document.getElementById('payoutFrontInfo');
+    const leftPanel = document.querySelector('.left-panel.flip-card');
+    const payoutInfoPrompt = document.getElementById('payoutInfoPrompt');
+    const payoutInfoDetails = document.getElementById('payoutInfoDetails');
     const payoutQrCodeContainer = document.getElementById('payoutQrCodeContainer');
     // Dropdown Multi-Select Elements
     const baNameSelectContainer = document.getElementById('baNameSelectContainer');
@@ -204,29 +205,43 @@ document.addEventListener('DOMContentLoaded', function() {
     if (searchButton) { searchButton.addEventListener('click', performSearch); }
     
     // --- Admin Panel Functions ---
-    // ... (This section is correct and unchanged)
+    // ... (This section is correct and unchanged) ...
     
     // --- Payout Form & Flip Card Logic ---
     function loadPayoutInfoCard() {
+        if (!leftPanel || !payoutInfoPrompt) return;
+
+        leftPanel.classList.remove('has-payout-info');
+        payoutInfoPrompt.style.display = 'none';
+
+        if (!userPermissions.has('VIEW_PAYOUT_CARD')) {
+            return;
+        }
+
         fetch('/api/get_payout_info')
             .then(res => res.json())
             .then(payoutData => {
                 if (payoutData.found && payoutData.data) {
                     const info = payoutData.data;
-                    payoutFrontInfo.innerHTML = `<div><strong>BA Name:</strong> ${info.ba_name}</div><div><strong>Acct. Name:</strong> ${info.mop_account_name}</div><div><strong>Number:</strong> ${info.mop_number}</div>`;
+                    
+                    payoutInfoDetails.innerHTML = `
+                        <div><span>BA Name:</span> <strong>${info.ba_name}</strong></div>
+                        <div><span>Acct. Name:</span> <strong>${info.mop_account_name}</strong></div>
+                        <div><span>Number:</span> <strong>${info.mop_number}</strong></div>
+                    `;
+
                     if (info.drive_file_id) {
                         payoutQrCodeContainer.innerHTML = `<img src="https://drive.google.com/uc?export=view&id=${info.drive_file_id}" alt="QR Code">`;
                     } else {
-                        payoutQrCodeContainer.innerHTML = `<p>No QR Image found.</p>`;
+                        payoutQrCodeContainer.innerHTML = `<p class="no-data-message">No QR Image on file.</p>`;
                     }
-                    payoutInfoFlipCard.style.display = 'block';
-                } else {
-                    payoutInfoFlipCard.style.display = 'none';
+
+                    leftPanel.classList.add('has-payout-info');
+                    payoutInfoPrompt.style.display = 'block';
                 }
             })
             .catch(error => {
                 console.error("Failed to load payout info:", error);
-                payoutInfoFlipCard.style.display = 'none';
             });
     }
 

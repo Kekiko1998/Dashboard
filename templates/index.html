@@ -87,50 +87,49 @@
                 <p>⚠️ No data found for the selected criteria, or the search parameters were insufficient.</p>
             </div>
             <div id="dashboardDataDisplay" class="dashboard-content-area" style="display: none;">
-              <div class="left-panel">
-                <div id="baNameDisplay" class="ba-name-display"></div>
-                
-                <!-- ================== NEW FLIP CARD FOR PAYOUT INFO ================== -->
-                <div id="payoutInfoFlipCard" class="flip-card" style="display: none;">
-                    <div class="flip-card-inner">
-                        <div class="flip-card-front">
-                            <h4>My Payout Info</h4>
-                            <p>(Hover to view details)</p>
-                            <div id="payoutFrontInfo" class="payout-front-info">
-                                <!-- Data will be loaded here by JS -->
-                            </div>
-                        </div>
-                        <div class="flip-card-back">
-                            <h4>QR Code</h4>
-                            <div id="payoutQrCodeContainer">
-                                <!-- QR Image will be loaded here by JS -->
-                            </div>
-                        </div>
+              <!-- The entire left panel is now the flip card container -->
+              <div class="left-panel flip-card">
+                <div class="flip-card-inner">
+                  <!-- Front Side of the Card -->
+                  <div class="flip-card-front">
+                    <div id="baNameDisplay" class="ba-name-display"></div>
+                    <div class="summary-section"><h4>SUMMARY</h4></div>
+                    <div class="summary-cards-container">
+                      <div class="summary-card"><span class="summary-label">TOTAL REG</span><span class="summary-value" id="totalRegistrationValue">0</span></div>
+                      <div class="summary-card"><span class="summary-label">TOTAL VALID FD</span><span class="summary-value" id="totalValidFdValue">0</span></div>
+                      <div class="summary-card"><span class="summary-label">TOTAL SUSPENDED</span><span class="summary-value" id="totalSuspendedValue">0</span></div>
+                      <div class="summary-card"><span class="summary-label">TOTAL SALARY</span><span class="summary-value" id="totalSalaryValue">0</span></div>
+                      <div class="summary-card"><span class="summary-label">INCENTIVES</span><span class="summary-value" id="totalIncentiveValue">₱0.00</span></div>
+                      <div id="commissionCard" class="summary-card" style="display: none;">
+                        <span class="summary-label">COMMISSION</span>
+                        <span class="summary-value" id="totalCommissionValue">0</span>
+                      </div>
                     </div>
-                </div>
-                <!-- =================================================================== -->
-
-                <div class="summary-section"><h4>SUMMARY</h4></div>
-                <div class="summary-cards-container">
-                  <div class="summary-card"><span class="summary-label">TOTAL REG</span><span class="summary-value" id="totalRegistrationValue">0</span></div>
-                  <div class="summary-card"><span class="summary-label">TOTAL VALID FD</span><span class="summary-value" id="totalValidFdValue">0</span></div>
-                  <div class="summary-card"><span class="summary-label">TOTAL SUSPENDED</span><span class="summary-value" id="totalSuspendedValue">0</span></div>
-                  <div class="summary-card"><span class="summary-label">TOTAL SALARY</span><span class="summary-value" id="totalSalaryValue">0</span></div>
-                  <div class="summary-card"><span class="summary-label">INCENTIVES</span><span class="summary-value" id="totalIncentiveValue">₱0.00</span></div>
-                  <div id="commissionCard" class="summary-card" style="display: none;">
-                    <span class="summary-label">COMMISSION</span>
-                    <span class="summary-value" id="totalCommissionValue">0</span>
+                    <div class="filter-display">
+                      <span id="monthDisplay">MONTH</span>
+                      <span id="weekDisplay">WEEK</span>
+                    </div>
+                    <div id="dateRangeDisplay" class="date-range-display"></div>
+                    <div class="status-display">STATUS: <span id="statusValue">N/A</span></div>
+                    <div class="ba-ranking-section">
+                      <h4>TOP BA RANKING (VALID FD)</h4>
+                      <div id="baRankingList" class="ba-ranking-list"></div>
+                    </div>
+                    <div class="payout-info-prompt" id="payoutInfoPrompt" style="display: none;">
+                      (Hover to view Payout Info)
+                    </div>
                   </div>
-                </div>
-                <div class="filter-display">
-                    <span id="monthDisplay">MONTH</span>
-                    <span id="weekDisplay">WEEK</span>
-                </div>
-                <div id="dateRangeDisplay" class="date-range-display"></div>
-                <div class="status-display">STATUS: <span id="statusValue">N/A</span></div>
-                <div class="ba-ranking-section">
-                    <h4>TOP BA RANKING (VALID FD)</h4>
-                    <div id="baRankingList" class="ba-ranking-list"></div>
+                  <!-- Back Side of the Card -->
+                  <div class="flip-card-back">
+                    <h4 class="payout-info-header">PAYOUT INFORMATION</h4>
+                    <div id="payoutInfoDetails" class="payout-info-details">
+                        <!-- Payout text details loaded here by JS -->
+                    </div>
+                    <div id="payoutQrCodeContainer" class="payout-qr-code-container">
+                        <!-- QR Image loaded here by JS -->
+                    </div>
+                    <div class="payout-info-prompt">(Hover to view Summary)</div>
+                  </div>
                 </div>
               </div>
               <div class="right-panel">
@@ -144,12 +143,11 @@
             </div>
         </div>
 
-        <!-- NEW PAYOUT AREA CONTENT -->
+        <!-- PAYOUT AREA CONTENT -->
         <div id="payoutArea" class="tab-content">
             <div class="payout-panel-container">
                 <h1>Submit Payout Information</h1>
                 <p>Please provide your payment details and upload a QR code image.</p>
-                
                 <div class="upload-warnings">
                     <h4>Important Reminders:</h4>
                     <ul>
@@ -160,7 +158,6 @@
                         <li>Any new upload will **overwrite** your previous submission.</li>
                     </ul>
                 </div>
-                
                 <form id="payoutForm" class="payout-form">
                     <div class="form-group">
                         <label for="payoutBaName">BA Name:</label>
@@ -181,7 +178,6 @@
                     <div id="imagePreviewContainer" class="image-preview-container" style="display: none;">
                         <img id="imagePreview" src="#" alt="Image Preview"/>
                     </div>
-                    
                     <button type="submit" id="uploadButton" class="upload-button">Upload Information</button>
                 </form>
                 <div id="uploadStatusMessage" class="upload-status-message"></div>
