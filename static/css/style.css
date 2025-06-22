@@ -653,3 +653,97 @@ input:checked + .slider:before {
     height: 16px;
     accent-color: var(--primary-blue);
 }
+
+/* --- Flip Card for Payout Info --- */
+.flip-card {
+  background-color: transparent;
+  width: 100%;
+  height: 180px; /* Adjust height as needed */
+  perspective: 1000px; /* Gives the 3D effect */
+  margin-bottom: 20px;
+  border-radius: 4px;
+}
+
+.flip-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  transition: transform 0.6s;
+  transform-style: preserve-3d;
+  box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+  border-radius: 4px;
+}
+
+.flip-card:hover .flip-card-inner {
+  transform: rotateY(180deg);
+}
+
+.flip-card-front, .flip-card-back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  -webkit-backface-visibility: hidden; /* For Safari */
+  backface-visibility: hidden;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 15px;
+  box-sizing: border-box;
+}
+
+.flip-card-front {
+  background-color: var(--primary-blue-darker);
+  color: var(--header-text-color);
+}
+
+.flip-card-back {
+  background-color: var(--panel-bg);
+  color: var(--text-color-main);
+  transform: rotateY(180deg);
+}
+
+.flip-card h4 {
+    font-family: var(--bebas-font);
+    font-size: 1.5em;
+    margin: 0 0 10px 0;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.flip-card-front p {
+    font-size: 0.8em;
+    opacity: 0.7;
+    margin: 0 0 15px 0;
+}
+
+.payout-front-info {
+    text-align: left;
+    width: 100%;
+    font-size: 0.9em;
+}
+
+.payout-front-info div {
+    margin-bottom: 5px;
+}
+
+.payout-front-info strong {
+    color: var(--header-text-color);
+    opacity: 0.8;
+}
+
+#payoutQrCodeContainer {
+    width: 100%;
+    height: 120px; /* Container for the QR code image */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#payoutQrCodeContainer img {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 4px;
+}

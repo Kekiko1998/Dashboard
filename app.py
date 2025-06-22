@@ -21,6 +21,7 @@ DATABASE_SHEET_NAME = 'DATABASE'
 LOGS_SHEET_ID = '1ZufXPOUcoW2czQ0vcpZwvJNHngV4GHbbSl9q46UwF8g'
 LOGS_SHEET_NAME = 'Web App Logs'
 USERS_SHEET_NAME = 'Users'
+PAYOUTS_SHEET_NAME = 'Payouts' # Added for saving payout info
 # ================== NEW GOOGLE DRIVE CONFIG ==================
 DRIVE_FOLDER_ID = '1qwCPheAuWIRG8PHK9j8PRz3vNNpJ3KHM' # <-- PASTE YOUR FOLDER ID HERE
 # =============================================================
@@ -257,35 +258,48 @@ def update_user_permission():
 
     return jsonify({"success": True, "message": f"Permissions for {target_email} updated."})
 
-@app.route('/api/ba-names', methods=['GET'])
+# --- API Routes ---
+@app.route('/api/user-info', methods=['GET'])
 @login_required
-def get_unique_ba_names():
-    data = get_sheet_data(DATABASE_SHEET_ID, f"{DATABASE_SHEET_NAME}!D:D") # More efficient
-    if not data or len(data) <= 1: return jsonify([])
-    ba_names = set(row[0].strip() for row in data[1:] if row and row[0])
-    return jsonify(sorted(list(ba_names)))
+def get_user_info():
+    return jsonify({
+        "email": current_user.email,
+        "name": current_user.name,
+        "isAdmin": current_user.is_admin,
+        "permissions": list(current_user.permissions)
+    })
 
-@app.route('/api/search', methods=['POST'])
+# ================== MISSING ROUTE RESTORED HERE ==================
+@app.route('/api/get_payout_info', methods=['GET'])
 @login_required
-def search_dashboard_data():
-    # This entire function is correct and unchanged
-    pass 
+def get_payout_info():
+    try:
+        payouts_data = get_sheet_data(DATABASE_SHEET_ID, f"{PAYOUTS_SHEET_NAME}!A:F")
+        if not payouts_data or len(payouts_data) < 2:
+            return jsonify({"found": False})
 
-@app.route('/api/save_dashboard', methods=['POST'])
-@login_required
-def save_dashboard():
-    # This entire function is correct and unchanged
-    pass
+        latest_entry = None
+        for row in reversed(payouts_data[1:]):
+            if len(row) > 1 and row[1] == current_user.email:
+                latest_entry = {
+                    "timestamp": row[0],
+                    "email": row[1],
+                    "ba_name": row[2] if len(row) > 2 else "N/A",
+                    "mop_account_name": row[3] if len(row) > 3 else "N/A",
+                    "mop_number": row[4] if len(row) > 4 else "N/A",
+                    "drive_file_id": row[5] if len(row) > 5 else None,
+                }
+                break 
 
-# ================== NEW API ENDPOINT FOR FILE UPLOAD ==================
-app.route('/api/upload_payout_info', methods=['POST'])
-@login_required
-def upload_payout_info():
-    if 'payoutBaName' not in request.form or 'mopAccountName' not in request.form or 'mopNumber' not in request.form:
-        return jsonify({"success": False, "error": "Missing form fields. Please fill out all required information."}), 400
-    
-    if 'payoutImage' not in request.files:
-        return jsonify({"success": False, "error": "No image file was uploaded."}), 400
+        if latest_entry:
+            return jsonify({"found": True, "data": latest_entry})
+        else:
+            return jsonify({"found": False})
+
+    except Exception as e:
+        logging.error(f"Error fetching payout info for {current_user.email}: {e}")
+        return jsonify({"found": False, "error": str(e)}), 500
+# ======================================================================
 
     ba_name = request.form['payoutBaName']
     mop_account_name = request.form['mopAccountName']
@@ -297,7 +311,6 @@ def upload_payout_info():
 
     try:
         drive_service = build('drive', 'v3', credentials=creds_service_account)
-
         
         safe_ba_name = "".join(c for c in ba_name if c.isalnum() or c in (' ', '_')).rstrip()
         filename = f"{safe_ba_name}.jpeg"
@@ -311,11 +324,42 @@ def upload_payout_info():
                                   mimetype='image/jpeg',
                                   resumable=True)
         
-        file = drive_service.files().create(body=file_metadata,
-                                            media_body=media,
-                                            fields='id').execute()
+        uploaded_file = drive_service.files().create(body=file_metadata,
+                                                     media_body=media,
+                                                     fields='id').execute()
+        drive_file_id = uploaded_file.get('id')
         
-        logging.info(f"User {current_user.email} uploaded file '{filename}' with ID: {file.get('id')}")
+        logging.info(f"User {current_user.email} uploaded file '{filename}' with ID: {drive_file_id}")
+
+        # ================== SAVE DATA TO PAYOUTS SHEET ==================
+        utc_now = datetime.now(pytz.utc)
+        local_tz = pytz.timezone(YOUR_TIMEZONE)
+        timestamp = utc_now.astimezone(local_tz).strftime('%Y-%m-%d %H:%M:%S')
+
+        new_payout_row = [
+            timestamp,
+            current_user.email,
+            ba_name,
+            mop_account_name,
+            mop_number,
+            drive_file_id
+        ]
+        
+        # Append the data to the 'Payouts' sheet
+        sheet_api.values().append(
+            spreadsheetId=DATABASE_SHEET_ID,
+            range=f"{PAYOUTS_SHEET_NAME}!A1",
+            valueInputOption='USER_ENTERED',
+            body={'values': [new_payout_row]}
+        ).execute()
+        # ===============================================================
+
+        log_user_event('uploadPayoutInfo', {
+            'ba_name_submitted': ba_name,
+            'account_name': mop_account_name,
+            'account_number': mop_number,
+            'filename': filename
+        })
 
         return jsonify({"success": True, "message": "Payout information and image uploaded successfully!"})
 

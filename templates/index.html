@@ -18,9 +18,7 @@
         <div class="tabs">
             <button id="homeTabBtn" class="tab-button active" onclick="showTab('homeArea', this)">Home</button>
             <button id="dashboardTabBtn" class="tab-button" onclick="showTab('dashboardDisplayArea', this)">Dashboard</button>
-            <!-- ================== NEW PAYOUT TAB ================== -->
             <button id="payoutTabBtn" class="tab-button" onclick="showTab('payoutArea', this)">Payout Info</button>
-            <!-- ==================================================== -->
             <button id="salaryTabBtn" class="tab-button" onclick="showTab('salarySchemeArea', this)">Salary Scheme</button>
             <button id="adminTabBtn" class="tab-button" onclick="showTab('adminArea', this)" style="display: none;">Admin</button>
         </div>
@@ -91,6 +89,27 @@
             <div id="dashboardDataDisplay" class="dashboard-content-area" style="display: none;">
               <div class="left-panel">
                 <div id="baNameDisplay" class="ba-name-display"></div>
+                
+                <!-- ================== NEW FLIP CARD FOR PAYOUT INFO ================== -->
+                <div id="payoutInfoFlipCard" class="flip-card" style="display: none;">
+                    <div class="flip-card-inner">
+                        <div class="flip-card-front">
+                            <h4>My Payout Info</h4>
+                            <p>(Hover to view details)</p>
+                            <div id="payoutFrontInfo" class="payout-front-info">
+                                <!-- Data will be loaded here by JS -->
+                            </div>
+                        </div>
+                        <div class="flip-card-back">
+                            <h4>QR Code</h4>
+                            <div id="payoutQrCodeContainer">
+                                <!-- QR Image will be loaded here by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- =================================================================== -->
+
                 <div class="summary-section"><h4>SUMMARY</h4></div>
                 <div class="summary-cards-container">
                   <div class="summary-card"><span class="summary-label">TOTAL REG</span><span class="summary-value" id="totalRegistrationValue">0</span></div>
@@ -139,17 +158,14 @@
                         <li>File size limit is **5MB**.</li>
                         <li>Allowed format is **JPEG/JPG or PNG**.</li>
                         <li>Any new upload will **overwrite** your previous submission.</li>
-                        <li>Rename the QR image of your BA Name Before Uploading.</li>
                     </ul>
                 </div>
                 
                 <form id="payoutForm" class="payout-form">
-                     <!-- ================== NEW BA NAME INPUT FIELD ================== -->
                     <div class="form-group">
                         <label for="payoutBaName">BA Name:</label>
                         <input type="text" id="payoutBaName" name="payoutBaName" required>
                     </div>
-                    <!-- ============================================================= -->
                     <div class="form-group">
                         <label for="mopAccountName">MOP Account Name:</label>
                         <input type="text" id="mopAccountName" name="mopAccountName" required>
