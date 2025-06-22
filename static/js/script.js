@@ -298,10 +298,12 @@ document.addEventListener('DOMContentLoaded', function() {
             uploadStatusMessage.textContent = 'Processing upload, please wait...';
             uploadStatusMessage.className = 'upload-status-message saving';
             const formData = new FormData(this);
+             // ====================== FIX IS HERE ======================
             fetch('/api/upload_payout_info', {
                 method: 'POST',
                 body: formData
             })
+            // =========================================================
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
@@ -362,9 +364,11 @@ document.addEventListener('DOMContentLoaded', function() {
         dashboardSearchError.style.display = 'none'; 
         loadingIndicator.style.display = 'flex';
         const searchPayload = { month: month, week: week, baNames: baNamesToSearch, palcode: palcode };
+        // ====================== FIX IS HERE ======================
         fetch('/api/search', {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(searchPayload),
         })
+        // =========================================================
         .then(res => {
             if (res.status === 401) { window.location.href = '/login'; return Promise.reject('Session expired'); }
             if (!res.ok) { return res.json().then(errData => { throw new Error(errData.error || `Server error: ${res.status}`); }); }
