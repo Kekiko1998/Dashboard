@@ -2,16 +2,13 @@ import os
 import json
 from datetime import datetime, timedelta
 from flask import Flask, jsonify, render_template, request, redirect, url_for, session
-from flask_cors import CORS
 from flask_login import LoginManager, current_user, login_required, login_user, logout_user, UserMixin
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
 from google_auth_oauthlib.flow import Flow
 import logging
 import requests
 import pytz
-import io
 
 # --- Basic Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -22,24 +19,22 @@ DATABASE_SHEET_NAME = 'DATABASE'
 LOGS_SHEET_ID = '1ZufXPOUcoW2czQ0vcpZwvJNHngV4GHbbSl9q46UwF8g'
 LOGS_SHEET_NAME = 'Web App Logs'
 USERS_SHEET_NAME = 'Users'
-PAYOUTS_SHEET_NAME = 'Payouts'
-DRIVE_FOLDER_ID = '1qwCPheAuWIRG8PHK9j8PRz3vNNpJ3KHM' # YOUR FOLDER ID
+# Root admins have hardcoded admin rights and cannot be changed via the UI.
 ADMIN_USER_EMAILS = ['harrypobreza@gmail.com'] 
+# Define all controllable features here
 ALL_PERMISSIONS = {
     'MULTI_SELECT',
     'SEARCH_ALL',
     'EDIT_TABLE',
-    'VIEW_COMMISSION',
-    'VIEW_PAYOUT_CARD'
+    'VIEW_COMMISSION'
 }
 YOUR_TIMEZONE = 'Asia/Manila'
 
 # --- Flask App Initialization ---
 app = Flask(__name__)
-CORS(app)
 app.secret_key = os.urandom(24)
 
-# --- User and Login Management ---
+# --- Updated User and Login Management ---
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
@@ -50,6 +45,7 @@ class User(UserMixin):
         self.name = name
         self.email = email
         self.is_admin = is_admin
+        # If user is admin, they get all permissions. Otherwise, use the permissions passed.
         self.permissions = ALL_PERMISSIONS if is_admin else (permissions or set())
 
 users = {} 
@@ -60,10 +56,7 @@ def load_user(user_id):
 # --- Google API Setup ---
 CLIENT_SECRET_FILE = 'client_secret.json'
 SCOPES_OAUTH = ['https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email', 'openid']
-SCOPES_SERVICE_ACCOUNT = [
-    'https://www.googleapis.com/auth/spreadsheets',
-    'https://www.googleapis.com/auth/drive'
-]
+SCOPES_SERVICE_ACCOUNT = ['https://www.googleapis.com/auth/spreadsheets']
 creds_service_account = None
 try:
     if 'GOOGLE_CREDENTIALS_JSON' in os.environ:
@@ -162,7 +155,8 @@ def callback():
         if len(sheet_row) > 4 and sheet_row[4]:
             permissions = set(p.strip() for p in sheet_row[4].split(','))
     else:
-        new_row = [user_id, user_email, user_name, str(is_admin).upper(), ""]
+        # New user, add them to the sheet with default empty permissions
+        new_row = [user_id, user_email, user_name, str(is_admin).upper(), ""] # Empty permissions
         sheet_api.values().append(
             spreadsheetId=DATABASE_SHEET_ID,
             range=f"{USERS_SHEET_NAME}!A1",
@@ -205,7 +199,7 @@ def get_all_users():
     
     users_list = []
     for row in user_data[1:]:
-        if len(row) > 0:
+        if len(row) > 0: # Check if row is not empty
              is_admin_flag = row[2].upper() == 'TRUE' if len(row) > 2 else False
              permissions_str = row[3] if len(row) > 3 else ""
              users_list.append({
@@ -260,9 +254,9 @@ def update_user_permission():
 @app.route('/api/ba-names', methods=['GET'])
 @login_required
 def get_unique_ba_names():
-    data = get_sheet_data(DATABASE_SHEET_ID, f"{DATABASE_SHEET_NAME}!D:D")
+    data = get_sheet_data(DATABASE_SHEET_ID, f"{DATABASE_SHEET_NAME}!A:L")
     if not data or len(data) <= 1: return jsonify([])
-    ba_names = set(row[0].strip() for row in data[1:] if row and row[0])
+    ba_names = set(row[3].strip() for row in data[1:] if len(row) > 3 and row[3])
     return jsonify(sorted(list(ba_names)))
 
 @app.route('/api/search', methods=['POST'])
@@ -394,111 +388,13 @@ def save_dashboard():
         logging.error(f"Error saving dashboard data: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/api/get_payout_info', methods=['GET'])
-@login_required
-def get_payout_info():
-    try:
-        payouts_data = get_sheet_data(DATABASE_SHEET_ID, f"{PAYOUTS_SHEET_NAME}!A:F")
-        if not payouts_data or len(payouts_data) < 2:
-            return jsonify({"found": False})
-
-        latest_entry = None
-        for row in reversed(payouts_data[1:]):
-            if len(row) > 1 and row[1] == current_user.email:
-                latest_entry = {
-                    "timestamp": row[0],
-                    "email": row[1],
-                    "ba_name": row[2] if len(row) > 2 else "N/A",
-                    "mop_account_name": row[3] if len(row) > 3 else "N/A",
-                    "mop_number": row[4] if len(row) > 4 else "N/A",
-                    "drive_file_id": row[5] if len(row) > 5 else None,
-                }
-                break 
-
-        if latest_entry:
-            return jsonify({"found": True, "data": latest_entry})
-        else:
-            return jsonify({"found": False})
-
-    except Exception as e:
-        logging.error(f"Error fetching payout info for {current_user.email}: {e}")
-        return jsonify({"found": False, "error": str(e)}), 500
-        
-@app.route('/api/upload_payout_info', methods=['POST'])
-@login_required
-def upload_payout_info():
-    if 'payoutBaName' not in request.form or 'mopAccountName' not in request.form or 'mopNumber' not in request.form:
-        return jsonify({"success": False, "error": "Missing form fields. Please fill out all required information."}), 400
-    
-    if 'payoutImage' not in request.files:
-        return jsonify({"success": False, "error": "No image file was uploaded."}), 400
-
-    ba_name = request.form['payoutBaName']
-    image_file = request.files['payoutImage']
-
-    if image_file.filename == '':
-        return jsonify({"success": False, "error": "No selected file."}), 400
-
-    try:
-        drive_service = build('drive', 'v3', credentials=creds_service_account)
-        
-        safe_ba_name = "".join(c for c in ba_name if c.isalnum() or c in (' ', '_')).rstrip()
-        filename = f"{safe_ba_name}.jpeg"
-
-        file_metadata = {
-            'name': filename,
-            'parents': [DRIVE_FOLDER_ID]
-        }
-        
-        media = MediaIoBaseUpload(io.BytesIO(image_file.read()),
-                                  mimetype='image/jpeg',
-                                  resumable=True)
-        
-        uploaded_file = drive_service.files().create(body=file_metadata,
-                                                     media_body=media,
-                                                     fields='id').execute()
-        drive_file_id = uploaded_file.get('id')
-        
-        logging.info(f"User {current_user.email} uploaded file '{filename}' with ID: {drive_file_id}")
-        
-        utc_now = datetime.now(pytz.utc)
-        local_tz = pytz.timezone(YOUR_TIMEZONE)
-        timestamp = utc_now.astimezone(local_tz).strftime('%Y-%m-%d %H:%M:%S')
-
-        new_payout_row = [
-            timestamp,
-            current_user.email,
-            ba_name,
-            request.form['mopAccountName'],
-            request.form['mopNumber'],
-            drive_file_id
-        ]
-        
-        sheet_api.values().append(
-            spreadsheetId=DATABASE_SHEET_ID,
-            range=f"{PAYOUTS_SHEET_NAME}!A1",
-            valueInputOption='USER_ENTERED',
-            body={'values': [new_payout_row]}
-        ).execute()
-
-        log_user_event('uploadPayoutInfo', {
-            'ba_name_submitted': ba_name,
-            'account_name': request.form['mopAccountName'],
-            'account_number': request.form['mopNumber'],
-            'filename': filename
-        })
-
-        return jsonify({"success": True, "message": "Payout information and image uploaded successfully!"})
-
-    except Exception as e:
-        logging.error(f"Error during file upload for user {current_user.email}: {e}")
-        return jsonify({"success": False, "error": f"An unexpected error occurred during upload: {e}"}), 500
-
 # Logging Function
 SHEET_ID_CACHE = {}
 def _get_sheet_id_by_name(spreadsheet_id, sheet_name):
+    """Gets the numeric ID of a sheet by its name, using a cache."""
     if spreadsheet_id in SHEET_ID_CACHE and sheet_name in SHEET_ID_CACHE[spreadsheet_id]:
         return SHEET_ID_CACHE[spreadsheet_id][sheet_name]
+
     try:
         spreadsheet_metadata = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
         for sheet in spreadsheet_metadata.get('sheets', []):
@@ -528,21 +424,49 @@ def log_user_event(function_name, inputs):
         timestamp = local_now.strftime('%A, %B %d, %Y, %I:%M:%S %p')
         user_email = current_user.email if current_user.is_authenticated else "Anonymous"
         
-        if function_name == 'uploadPayoutInfo':
-            formatted_inputs = f"Payout Submitted: BA - {inputs.get('ba_name_submitted', 'N/A')}, Acct Name - {inputs.get('account_name', 'N/A')}, Num - {inputs.get('account_number', 'N/A')}, Filename - {inputs.get('filename', 'N/A')}"
-        elif function_name == 'saveDashboardData':
+        if function_name == 'saveDashboardData':
             formatted_inputs = f"Updated data for {len(inputs.get('updated_palcodes', []))} palcodes."
         else:
             ba_names_str = ', '.join(inputs.get('baNames', [])) if inputs.get('baNames') else "N/A"
             formatted_inputs = f"Month - {inputs.get('month', 'N/A')}, Week - {inputs.get('week', 'N/A').replace('week ', '')}, Ba Name(s) - {ba_names_str}, Palcode - {inputs.get('palcode', 'N/A') or 'N/A'}"
         
         new_row_data = [timestamp, user_email, function_name, formatted_inputs]
-        
+
         requests_body = [
-            {"insertDimension": {"range": {"sheetId": logs_sheet_id, "dimension": "ROWS", "startIndex": 1, "endIndex": 2}}},
-            {"updateCells": {"rows": [{"values": [{"userEnteredValue": {"stringValue": str(cell)}} for cell in new_row_data]}], "fields": "userEnteredValue", "start": {"sheetId": logs_sheet_id, "rowIndex": 1, "columnIndex": 0}}}
+            {
+                "insertDimension": {
+                    "range": {
+                        "sheetId": logs_sheet_id,
+                        "dimension": "ROWS",
+                        "startIndex": 1,
+                        "endIndex": 2
+                    }
+                }
+            },
+            {
+                "updateCells": {
+                    "rows": [
+                        {
+                            "values": [
+                                {"userEnteredValue": {"stringValue": str(cell)}} for cell in new_row_data
+                            ]
+                        }
+                    ],
+                    "fields": "userEnteredValue",
+                    "start": {
+                        "sheetId": logs_sheet_id,
+                        "rowIndex": 1,
+                        "columnIndex": 0
+                    }
+                }
+            }
         ]
-        sheet_api.batchUpdate(spreadsheetId=LOGS_SHEET_ID, body={'requests': requests_body}).execute()
+
+        sheet_api.batchUpdate(
+            spreadsheetId=LOGS_SHEET_ID,
+            body={'requests': requests_body}
+        ).execute()
+
     except Exception as e:
         logging.error(f"Error logging event by inserting row: {e}")
 

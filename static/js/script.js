@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchButton = document.getElementById('searchButton');
     const monthSelect = document.getElementById('monthSelect');
     const weekSelect = document.getElementById('weekSelect');
-    const baNameInput = document.getElementById('baNameInput'); // For regular users
+    let baNameInput = document.getElementById('baNameInput');
     const palcodeInput = document.getElementById('palcodeInput');
     const homeErrorMessage = document.getElementById('homeErrorMessage');
     const dashboardTabBtn = document.getElementById('dashboardTabBtn');
@@ -18,59 +18,35 @@ document.addEventListener('DOMContentLoaded', function() {
     const dashboardDataDisplay = document.getElementById('dashboardDataDisplay');
     const dashboardSearchError = document.getElementById('dashboardSearchError');
     const darkModeToggleButton = document.getElementById('darkModeToggle');
+    const baNameSuggestions = document.getElementById('baNameSuggestions');
     const adminTabBtn = document.getElementById('adminTabBtn');
     const userManagementTableContainer = document.getElementById('userManagementTableContainer');
     const adminStatusMessage = document.getElementById('adminStatusMessage');
     const tableControls = document.getElementById('tableControls');
     const saveButton = document.getElementById('saveButton');
     const saveStatusMessage = document.getElementById('saveStatusMessage');
-    // Payout Form Elements
-    const payoutForm = document.getElementById('payoutForm');
-    const uploadButton = document.getElementById('uploadButton');
-    const uploadStatusMessage = document.getElementById('uploadStatusMessage');
-    const payoutImageInput = document.getElementById('payoutImage');
-    const imagePreviewContainer = document.getElementById('imagePreviewContainer');
-    const imagePreview = document.getElementById('imagePreview');
-    const payoutBaNameInput = document.getElementById('payoutBaName');
-    // Flip Card Elements
-    const leftPanel = document.querySelector('.left-panel.flip-card');
-    const payoutInfoPrompt = document.getElementById('payoutInfoPrompt');
-    const payoutInfoDetails = document.getElementById('payoutInfoDetails');
-    const payoutQrCodeContainer = document.getElementById('payoutQrCodeContainer');
-    // Dropdown Multi-Select Elements
-    const baNameSelectContainer = document.getElementById('baNameSelectContainer');
-    const baNameSelectButton = document.getElementById('baNameSelectButton');
-    const baNameDropdown = document.getElementById('baNameDropdown');
-    const baNameSearchInput = document.getElementById('baNameSearchInput');
-    const baNameCheckboxList = document.getElementById('baNameCheckboxList');
 
     // --- State Variables ---
     let isAdmin = false;
-    let userPermissions = new Set();
+    let userPermissions = new Set(); // Use a Set for fast permission lookups
+    let selectedBaNamesState = [];
     const statusOptions = ['PAID', 'DELAYED', 'UPDATING', 'INVALID', 'UNOFFICIAL'];
 
-    // --- Initial Data Fetching & UI Setup ---
+    // --- Initial Data Fetching ---
     function setupUIForUser(userInfo) {
         isAdmin = userInfo.isAdmin;
         userPermissions = new Set(userInfo.permissions);
+
         userNameSpan.textContent = userInfo.name;
         userInfoDiv.style.display = 'flex';
 
-        if (payoutBaNameInput) {
-            payoutBaNameInput.value = userInfo.name || '';
-        }
-        
         if (isAdmin) {
             adminTabBtn.style.display = 'block';
         }
 
-        // PERMISSION CHECK: Decide which BA Name input to show
-        if (userPermissions.has('MULTI_SELECT') || userPermissions.has('SEARCH_ALL')) {
-            baNameSelectContainer.style.display = 'block';
-            baNameInput.style.display = 'none';
-        } else {
-            baNameSelectContainer.style.display = 'none';
-            baNameInput.style.display = 'block';
+        const activeTabButton = document.querySelector('.tab-button.active');
+        if (userPermissions.has('MULTI_SELECT') && activeTabButton && activeTabButton.id === 'homeTabBtn') {
+            switchToMultiSelectView();
         }
     }
 
@@ -79,74 +55,111 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!response.ok) { throw new Error('Network response was not ok'); }
         return response.json();
     }).then(userInfo => {
-        if (userInfo) {
-            setupUIForUser(userInfo);
-            // Only populate the dropdown if the user has permissions for it
-            if (userPermissions.has('MULTI_SELECT') || userPermissions.has('SEARCH_ALL')) {
-                populateBaNameDropdown();
-            }
-        }
+        if (userInfo) { setupUIForUser(userInfo); populateBaNameSuggestions(); }
     }).catch(error => console.error("Initialization failed:", error));
-    
-    // --- Custom Multi-Select Dropdown Logic ---
-    function populateBaNameDropdown() {
+
+    function populateBaNameSuggestions() {
         fetch('/api/ba-names').then(res => res.json()).then(names => {
-            baNameCheckboxList.innerHTML = '';
-            names.forEach(name => {
-                const label = document.createElement('label');
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.value = name;
-                checkbox.addEventListener('change', updateBaNameButtonText);
-                
-                label.appendChild(checkbox);
-                label.appendChild(document.createTextNode(` ${name}`));
-                baNameCheckboxList.appendChild(label);
-            });
+            if (baNameSuggestions && names && names.length > 0) {
+                baNameSuggestions.innerHTML = '';
+                names.forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    baNameSuggestions.appendChild(option);
+                });
+            }
         }).catch(err => console.error('Error fetching BA names:', err));
     }
 
-    function updateBaNameButtonText() {
-        const checkedBoxes = baNameCheckboxList.querySelectorAll('input[type="checkbox"]:checked');
-        if (checkedBoxes.length === 0) {
-            baNameSelectButton.textContent = 'SELECT BA NAME';
-            baNameSelectButton.classList.remove('has-selection');
-        } else if (checkedBoxes.length === 1) {
-            baNameSelectButton.textContent = checkedBoxes[0].value;
-            baNameSelectButton.classList.add('has-selection');
+    // --- Special User UI Transformation Functions ---
+    function switchToMultiSelectView() {
+        if (document.getElementById('baNameMultiSelectWrapper') || !userPermissions.has('MULTI_SELECT')) return;
+        const currentInput = document.getElementById('baNameInput');
+        const originalParent = currentInput.parentNode;
+        const wrapper = document.createElement('div');
+        wrapper.id = 'baNameMultiSelectWrapper';
+        wrapper.className = 'ba-input-wrapper-flex';
+        originalParent.replaceChild(wrapper, currentInput);
+        wrapper.appendChild(currentInput);
+        baNameInput = document.getElementById('baNameInput');
+        baNameInput.placeholder = 'TYPE BA NAME & PRESS ENTER, OR LEAVE BLANK FOR ALL';
+        baNameInput.value = '';
+        selectedBaNamesState.forEach(name => addTag(name, false));
+        updateVisibleTags();
+        baNameInput.addEventListener('keydown', handleMultiSelectKeyDown);
+        wrapper.addEventListener('click', handleWrapperClick);
+    }
+    function switchToSimpleView() {
+        if (!userPermissions.has('MULTI_SELECT')) return;
+        const wrapper = document.getElementById('baNameMultiSelectWrapper');
+        if (!wrapper) return;
+        const input = document.getElementById('baNameInput');
+        const parent = wrapper.parentNode;
+        parent.replaceChild(input, wrapper);
+        baNameInput = document.getElementById('baNameInput');
+        baNameInput.placeholder = 'ENTER BA NAME';
+        baNameInput.classList.remove('placeholder-hidden');
+        if (selectedBaNamesState.length === 1) {
+            baNameInput.value = selectedBaNamesState[0];
         } else {
-            baNameSelectButton.textContent = `${checkedBoxes.length} BAs SELECTED`;
-            baNameSelectButton.classList.add('has-selection');
+            baNameInput.value = '';
         }
+        input.removeEventListener('keydown', handleMultiSelectKeyDown);
     }
-
-    if (baNameSelectButton) {
-        baNameSelectButton.addEventListener('click', () => {
-            baNameDropdown.classList.toggle('show');
-        });
-    }
-
-    if (baNameSearchInput) {
-        baNameSearchInput.addEventListener('keyup', () => {
-            const filter = baNameSearchInput.value.toUpperCase();
-            const labels = baNameCheckboxList.getElementsByTagName('label');
-            for (let i = 0; i < labels.length; i++) {
-                const txtValue = labels[i].textContent || labels[i].innerText;
-                if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                    labels[i].style.display = "flex";
-                } else {
-                    labels[i].style.display = "none";
-                }
+    function handleMultiSelectKeyDown(e) { if (e.key === 'Enter' && baNameInput.value.trim() !== '') { e.preventDefault(); addTag(baNameInput.value.trim(), true); baNameInput.value = ''; } }
+    function handleWrapperClick(e) { if (e.target.id === 'baNameMultiSelectWrapper') { baNameInput.focus(); } }
+    function updateVisibleTags() {
+        const wrapper = document.getElementById('baNameMultiSelectWrapper');
+        if (!wrapper) return;
+        const allNameTags = Array.from(wrapper.querySelectorAll('.ba-tag[data-name]'));
+        const existingCounter = wrapper.querySelector('.ba-tag-counter');
+        if (existingCounter) wrapper.removeChild(existingCounter);
+        allNameTags.forEach(tag => tag.style.display = 'none');
+        if (allNameTags.length > 0) {
+            const lastTag = allNameTags[allNameTags.length - 1];
+            lastTag.style.display = 'inline-flex';
+            if (allNameTags.length > 1) {
+                const counterTag = document.createElement('div');
+                counterTag.className = 'ba-tag ba-tag-counter';
+                counterTag.textContent = `+${allNameTags.length - 1}`;
+                counterTag.title = `${allNameTags.length - 1} more BA(s) selected`;
+                wrapper.insertBefore(counterTag, lastTag.nextSibling);
             }
-        });
-    }
-
-    window.addEventListener('click', function(e) {
-        if (baNameSelectContainer && !baNameSelectContainer.contains(e.target)) {
-            baNameDropdown.classList.remove('show');
+            baNameInput.classList.add('placeholder-hidden');
+        } else {
+            baNameInput.classList.remove('placeholder-hidden');
         }
-    });
-
+    }
+    function addTag(name, updateStateArray) {
+        if (updateStateArray) {
+            const lowerCaseName = name.toLowerCase();
+            if (!selectedBaNamesState.map(n => n.toLowerCase()).includes(lowerCaseName)) {
+                selectedBaNamesState.push(name);
+            } else { return; }
+        }
+        const wrapper = document.getElementById('baNameMultiSelectWrapper');
+        if (!wrapper) return;
+        const tag = document.createElement('div');
+        tag.className = 'ba-tag';
+        tag.setAttribute('data-name', name);
+        const tagName = document.createElement('span');
+        tagName.textContent = name;
+        tag.appendChild(tagName);
+        const removeBtn = document.createElement('span');
+        removeBtn.className = 'remove-tag';
+        removeBtn.innerHTML = '×';
+        removeBtn.title = `Remove ${name}`;
+        removeBtn.onclick = function(event) {
+            event.stopPropagation();
+            selectedBaNamesState = selectedBaNamesState.filter(n => n.toLowerCase() !== name.toLowerCase());
+            wrapper.removeChild(tag);
+            updateVisibleTags();
+        };
+        tag.appendChild(removeBtn);
+        wrapper.insertBefore(tag, baNameInput);
+        updateVisibleTags();
+    }
+    
     // --- UI MANAGEMENT (DARK MODE, TABS, WEEK 5) ---
     function setDarkMode(isDark) {
         if (isDark) {
@@ -163,21 +176,26 @@ document.addEventListener('DOMContentLoaded', function() {
         const isCurrentlyDark = !document.body.classList.contains('light-mode');
         setDarkMode(!isCurrentlyDark);
     });
-    if (localStorage.getItem('dashboardTheme') === 'light') { setDarkMode(false); } else { setDarkMode(true); }
+    if (localStorage.getItem('dashboardTheme') === 'light') {
+        setDarkMode(false);
+    } else {
+        setDarkMode(true);
+    }
 
     window.showTab = function(tabId, clickedButton) {
         document.querySelectorAll(".tab-content").forEach(tab => tab.classList.remove('active-content'));
         document.querySelectorAll(".tab-button").forEach(btn => btn.classList.remove("active"));
-        
         document.getElementById(tabId).classList.add('active-content');
         clickedButton.classList.add("active");
 
-        if (tabId !== 'homeArea') {
-            topLeftDynamicContent.appendChild(homeTitleContainer);
-            topLeftDynamicContent.appendChild(homeSearchControlsContainer);
-        } else {
+        if (tabId === 'homeArea') {
             homeContentCentered.appendChild(homeTitleContainer);
             homeContentCentered.appendChild(homeSearchControlsContainer);
+            if (userPermissions.has('MULTI_SELECT')) switchToMultiSelectView();
+        } else {
+            topLeftDynamicContent.appendChild(homeTitleContainer);
+            topLeftDynamicContent.appendChild(homeSearchControlsContainer);
+            if (userPermissions.has('MULTI_SELECT')) switchToSimpleView();
         }
 
         if (tabId === 'adminArea' && isAdmin) {
@@ -188,6 +206,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function handleMonthChange() {
         const selectedMonth = monthSelect.value;
         const week5Option = document.getElementById('week5Option');
+
         if (week5Option) {
             if (selectedMonth.toLowerCase() === 'june') {
                 week5Option.style.display = 'block';
@@ -203,128 +222,128 @@ document.addEventListener('DOMContentLoaded', function() {
     handleMonthChange();
 
     if (searchButton) { searchButton.addEventListener('click', performSearch); }
-    
+
     // --- Admin Panel Functions ---
-    // ... (This section is correct and unchanged)
-    
-    function loadPayoutInfoCard() {
-    if (!leftPanel || !payoutInfoPrompt) return;
-
-    leftPanel.classList.remove('has-payout-info');
-    payoutInfoPrompt.style.display = 'none';
-
-    if (!userPermissions.has('VIEW_PAYOUT_CARD')) {
-        return;
+    function loadUserManagementPanel() {
+        userManagementTableContainer.innerHTML = '<div class="loading-indicator">⏳ Loading users...</div>';
+        adminStatusMessage.textContent = '';
+        
+        fetch('/api/users')
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) throw new Error(data.error);
+                buildUserTable(data.users, data.all_permissions);
+            })
+            .catch(error => {
+                userManagementTableContainer.innerHTML = `<p class="error-message-main">❌ ${error.message}</p>`;
+            });
     }
 
-    fetch('/api/get_payout_info')
+    function buildUserTable(users, allPermissions) {
+        userManagementTableContainer.innerHTML = '';
+        const table = document.createElement('table');
+        table.id = 'userManagementTable';
+        
+        const thead = document.createElement('thead');
+        let headerRowHtml = '<tr><th>Name</th><th>Email</th>';
+        allPermissions.forEach(perm => {
+            headerRowHtml += `<th>${perm.replace('_', ' ')}</th>`;
+        });
+        headerRowHtml += '<th>Action</th></tr>';
+        thead.innerHTML = headerRowHtml;
+        table.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
+        users.forEach(user => {
+            const tr = document.createElement('tr');
+            tr.dataset.email = user.email;
+
+            let rowHtml = `<td>${user.name}</td><td>${user.email}</td>`;
+            const userPerms = new Set(user.permissions);
+            
+            allPermissions.forEach(perm => {
+                const isChecked = userPerms.has(perm) ? 'checked' : '';
+                const isDisabled = user.is_admin ? 'disabled' : '';
+                rowHtml += `
+                    <td>
+                        <label class="switch">
+                            <input type="checkbox" data-permission="${perm}" ${isChecked} ${isDisabled}>
+                            <span class="slider round"></span>
+                        </label>
+                    </td>`;
+            });
+
+            const saveButtonDisabled = user.is_admin ? 'disabled' : '';
+            rowHtml += `<td><button class="save-permissions-btn" ${saveButtonDisabled}>Save</button></td>`;
+            tr.innerHTML = rowHtml;
+            tbody.appendChild(tr);
+        });
+
+        table.appendChild(tbody);
+        userManagementTableContainer.appendChild(table);
+
+        document.querySelectorAll('.save-permissions-btn').forEach(button => {
+            button.addEventListener('click', handlePermissionSave);
+        });
+    }
+
+    function handlePermissionSave(event) {
+        const button = event.target;
+        const row = button.closest('tr');
+        const email = row.dataset.email;
+        
+        const selectedPermissions = [];
+        row.querySelectorAll('input[type="checkbox"]:checked').forEach(checkbox => {
+            selectedPermissions.push(checkbox.dataset.permission);
+        });
+
+        button.textContent = 'Saving...';
+        button.disabled = true;
+        adminStatusMessage.textContent = '';
+
+        fetch('/api/update_user_permission', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ email: email, permissions: selectedPermissions })
+        })
         .then(res => res.json())
-        .then(payoutData => {
-            if (payoutData.found && payoutData.data) {
-                const info = payoutData.data;
-                
-                payoutInfoDetails.innerHTML = `
-                    <div><span>BA Name:</span> <strong>${info.ba_name}</strong></div>
-                    <div><span>Acct. Name:</span> <strong>${info.mop_account_name}</strong></div>
-                    <div><span>Number:</span> <strong>${info.mop_number}</strong></div>
-                `;
-
-                if (info.drive_file_id) {
-                    // ====================== THIS IS THE FIX ======================
-                    // This new URL format bypasses the viewer and provides the raw image content.
-                    const imageUrl = `https://lh3.googleusercontent.com/d/${info.drive_file_id}`;
-                    payoutQrCodeContainer.innerHTML = `<img src="${imageUrl}" alt="QR Code">`;
-                    // =============================================================
-                } else {
-                    payoutQrCodeContainer.innerHTML = `<p class="no-data-message">No QR Image on file.</p>`;
-                }
-
-                leftPanel.classList.add('has-payout-info');
-                payoutInfoPrompt.style.display = 'block';
+        .then(data => {
+            if (data.success) {
+                adminStatusMessage.textContent = data.message;
+                adminStatusMessage.className = 'admin-status-message success';
+            } else {
+                throw new Error(data.error);
             }
         })
         .catch(error => {
-            console.error("Failed to load payout info:", error);
-        });
-}
-
-    if (payoutImageInput) {
-        payoutImageInput.addEventListener('change', function() {
-            if (uploadStatusMessage) uploadStatusMessage.textContent = '';
-            const file = this.files[0];
-            if (file) {
-                if (file.size > 5 * 1024 * 1024) {
-                    alert('Error: File size exceeds 5MB limit.');
-                    this.value = '';
-                    imagePreviewContainer.style.display = 'none';
-                    return;
-                }
-                if (!['image/jpeg', 'image/png'].includes(file.type)) {
-                    alert('Error: Only JPEG and PNG files are allowed.');
-                    this.value = '';
-                    imagePreviewContainer.style.display = 'none';
-                    return;
-                }
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    imagePreview.src = e.target.result;
-                    imagePreviewContainer.style.display = 'block';
-                }
-                reader.readAsDataURL(file);
-            } else {
-                imagePreviewContainer.style.display = 'none';
+            adminStatusMessage.textContent = `Error: ${error.message}`;
+            adminStatusMessage.className = 'admin-status-message error';
+        })
+        .finally(() => {
+            button.textContent = 'Save';
+            if (!row.querySelector('input[type=checkbox]').disabled) {
+                button.disabled = false;
             }
-        });
-    }
-
-    if (payoutForm) {
-        payoutForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            uploadButton.disabled = true;
-            uploadButton.textContent = 'UPLOADING...';
-            uploadStatusMessage.textContent = 'Processing upload, please wait...';
-            uploadStatusMessage.className = 'upload-status-message saving';
-            const formData = new FormData(this);
-            fetch('/api/upload_payout_info', {
-                method: 'POST',
-                body: formData
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    uploadStatusMessage.textContent = data.message;
-                    uploadStatusMessage.className = 'upload-status-message success';
-                    payoutForm.reset();
-                    imagePreviewContainer.style.display = 'none';
-                    if(payoutBaNameInput) payoutBaNameInput.value = userNameSpan.textContent || '';
-                } else {
-                    throw new Error(data.error);
-                }
-            })
-            .catch(error => {
-                uploadStatusMessage.textContent = `Error: ${error.message}`;
-                uploadStatusMessage.className = 'upload-status-message error';
-            })
-            .finally(() => {
-                uploadButton.disabled = false;
-                uploadButton.textContent = 'Upload Information';
-            });
+            setTimeout(() => { adminStatusMessage.textContent = ''; adminStatusMessage.className = 'admin-status-message'; }, 5000);
         });
     }
 
     // --- Search & Data Handling ---
     function performSearch() {
         const month = monthSelect.value, week = weekSelect.value, palcode = palcodeInput.value.trim();
-        let baNamesToSearch = [];
-        
-        if (userPermissions.has('MULTI_SELECT') || userPermissions.has('SEARCH_ALL')) {
-            const checkedBoxes = baNameCheckboxList.querySelectorAll('input[type="checkbox"]:checked');
-            checkedBoxes.forEach(checkbox => baNamesToSearch.push(checkbox.value));
+        let baNamesToSearch;
+        const baNameInputValue = document.getElementById('baNameInput').value.trim();
+        if (userPermissions.has('MULTI_SELECT')) {
+            if (document.getElementById('baNameMultiSelectWrapper')) {
+                if (baNameInputValue !== '') { addTag(baNameInputValue, true); document.getElementById('baNameInput').value = ''; }
+                baNamesToSearch = selectedBaNamesState;
+            } else {
+                baNamesToSearch = baNameInputValue ? [baNameInputValue] : [];
+            }
         } else {
-            const baNameValue = baNameInput.value.trim();
-            if (baNameValue) baNamesToSearch.push(baNameValue);
+             baNamesToSearch = baNameInputValue ? [baNameInputValue] : [];
         }
-        
+
         const errorTarget = document.getElementById('homeErrorMessage'); 
         errorTarget.textContent = ''; 
         let missingFields = [];
@@ -367,19 +386,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         const hasData = (data.resultsTable && data.resultsTable.length > 0) || (data.summary && data.summary.totalValidFd > 0);
         if (hasData) {
-            dashboardSearchError.style.display = 'none'; 
-            populateDashboardWithData(data); 
-            if (userPermissions.has('VIEW_PAYOUT_CARD')) {
-                loadPayoutInfoCard();
-            }
-            dashboardDataDisplay.style.display = 'flex';
+            dashboardSearchError.style.display = 'none'; populateDashboardWithData(data); dashboardDataDisplay.style.display = 'flex';
         } else {
             dashboardSearchError.querySelector('p').textContent = `⚠️ ${data.message || 'No data found for this query.'}`;
-            dashboardSearchError.style.display = 'flex'; 
-            dashboardDataDisplay.style.display = 'none';
+            dashboardSearchError.style.display = 'flex'; dashboardDataDisplay.style.display = 'none';
         }
     }
-    
     function handleSearchFailure(error) {
         if (error.message.includes('Session expired')) { console.log("Session expired, redirecting..."); return; }
         searchButton.disabled = false; searchButton.textContent = 'SEARCH'; loadingIndicator.style.display = 'none';
@@ -421,7 +433,7 @@ document.addEventListener('DOMContentLoaded', function() {
             baNameDisplay.className = 'ba-name-display'; 
             const selectedNames = data.searchCriteria?.baNames || [];
             
-            if (selectedNames.length > 1 && (userPermissions.has('MULTI_SELECT') || userPermissions.has('SEARCH_ALL'))) {
+            if (selectedNames.length > 1 && userPermissions.has('MULTI_SELECT')) {
                 const namesContainer = document.createElement('div');
                 namesContainer.className = 'ba-name-scroll-content';
                 const appendNames = () => {
