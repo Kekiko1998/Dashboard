@@ -265,7 +265,6 @@ def get_unique_ba_names():
     ba_names = set(row[0].strip() for row in data[1:] if row and row[0])
     return jsonify(sorted(list(ba_names)))
 
-# ================== SEARCH FUNCTION RESTORED ==================
 @app.route('/api/search', methods=['POST'])
 @login_required
 def search_dashboard_data():
@@ -345,7 +344,6 @@ def search_dashboard_data():
         elif 'SEARCH_ALL' in current_user.permissions: summary_for_display['totalIncentives'] = sum_of_all_individual_incentives
     
     return jsonify({ "baNameDisplay": ba_display_name, "searchCriteria": search_criteria_frontend, "summary": summary_for_display, "monthDisplay": search_month.upper(), "weekDisplay": search_week.upper(), "dateRangeDisplay": date_range_display, "status": "Active", "resultsTable": results_for_table, "rankedBaList": final_ranked_ba_list, "lastUpdate": last_update_timestamp })
-# =============================================================
 
 @app.route('/api/save_dashboard', methods=['POST'])
 @login_required
@@ -496,8 +494,59 @@ def upload_payout_info():
         logging.error(f"Error during file upload for user {current_user.email}: {e}")
         return jsonify({"success": False, "error": f"An unexpected error occurred during upload: {e}"}), 500
 
-# Logging Function
-# ... (This function is correct and unchanged) ...
+# ================== LOGGING FUNCTIONS RESTORED ==================
+SHEET_ID_CACHE = {}
+def _get_sheet_id_by_name(spreadsheet_id, sheet_name):
+    if spreadsheet_id in SHEET_ID_CACHE and sheet_name in SHEET_ID_CACHE[spreadsheet_id]:
+        return SHEET_ID_CACHE[spreadsheet_id][sheet_name]
+    try:
+        spreadsheet_metadata = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+        for sheet in spreadsheet_metadata.get('sheets', []):
+            props = sheet.get('properties', {})
+            if props.get('title') == sheet_name:
+                sheet_id = props.get('sheetId')
+                if spreadsheet_id not in SHEET_ID_CACHE:
+                    SHEET_ID_CACHE[spreadsheet_id] = {}
+                SHEET_ID_CACHE[spreadsheet_id][sheet_name] = sheet_id
+                return sheet_id
+        return None
+    except Exception as e:
+        logging.error(f"Could not get sheet ID for '{sheet_name}': {e}")
+        return None
+
+def log_user_event(function_name, inputs):
+    if not sheet_api: return
+    try:
+        logs_sheet_id = _get_sheet_id_by_name(LOGS_SHEET_ID, LOGS_SHEET_NAME)
+        if logs_sheet_id is None:
+            logging.error(f"Could not find sheet named '{LOGS_SHEET_NAME}' to log event.")
+            return
+
+        utc_now = datetime.now(pytz.utc)
+        local_tz = pytz.timezone(YOUR_TIMEZONE)
+        local_now = utc_now.astimezone(local_tz)
+        timestamp = local_now.strftime('%A, %B %d, %Y, %I:%M:%S %p')
+        user_email = current_user.email if current_user.is_authenticated else "Anonymous"
+        
+        if function_name == 'uploadPayoutInfo':
+            formatted_inputs = f"Payout Submitted: BA - {inputs.get('ba_name_submitted', 'N/A')}, Acct Name - {inputs.get('account_name', 'N/A')}, Num - {inputs.get('account_number', 'N/A')}, Filename - {inputs.get('filename', 'N/A')}"
+        elif function_name == 'saveDashboardData':
+            formatted_inputs = f"Updated data for {len(inputs.get('updated_palcodes', []))} palcodes."
+        else:
+            ba_names_str = ', '.join(inputs.get('baNames', [])) if inputs.get('baNames') else "N/A"
+            formatted_inputs = f"Month - {inputs.get('month', 'N/A')}, Week - {inputs.get('week', 'N/A').replace('week ', '')}, Ba Name(s) - {ba_names_str}, Palcode - {inputs.get('palcode', 'N/A') or 'N/A'}"
+        
+        new_row_data = [timestamp, user_email, function_name, formatted_inputs]
+        
+        requests_body = [
+            {"insertDimension": {"range": {"sheetId": logs_sheet_id, "dimension": "ROWS", "startIndex": 1, "endIndex": 2}}},
+            {"updateCells": {"rows": [{"values": [{"userEnteredValue": {"stringValue": str(cell)}} for cell in new_row_data]}], "fields": "userEnteredValue", "start": {"sheetId": logs_sheet_id, "rowIndex": 1, "columnIndex": 0}}}
+        ]
+        sheet_api.batchUpdate(spreadsheetId=LOGS_SHEET_ID, body={'requests': requests_body}).execute()
+    except Exception as e:
+        logging.error(f"Error logging event by inserting row: {e}")
+# =============================================================
+
 if __name__ == '__main__':
     os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
     app.run(host='0.0.0.0', port=5001, debug=True)
