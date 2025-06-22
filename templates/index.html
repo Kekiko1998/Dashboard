@@ -18,7 +18,8 @@
         <div class="tabs">
             <button id="homeTabBtn" class="tab-button active" onclick="showTab('homeArea', this)">Home</button>
             <button id="dashboardTabBtn" class="tab-button" onclick="showTab('dashboardDisplayArea', this)">Dashboard</button>
-            <button id="payoutTabBtn" class="tab-button" onclick="showTab('payoutArea', this)">Payout Info</button>
+            <button id="payoutFormTabBtn" class="tab-button" onclick="showTab('payoutFormArea', this)">Submit Payout</button>
+            <button id="myPayoutTabBtn" class="tab-button" onclick="showTab('myPayoutArea', this)" style="display: none;">My Payout</button>
             <button id="salaryTabBtn" class="tab-button" onclick="showTab('salarySchemeArea', this)">Salary Scheme</button>
             <button id="adminTabBtn" class="tab-button" onclick="showTab('adminArea', this)" style="display: none;">Admin</button>
         </div>
@@ -54,7 +55,7 @@
                             <option id="week5Option" value="Week 5">Week 5</option>
                         </select>
                         
-                        <!-- Multi-Select Dropdown System -->
+                        <!-- Multi-Select Dropdown System for users with permission -->
                         <div id="baNameSelectContainer" class="ba-name-select-container" style="display: none;">
                             <button id="baNameSelectButton" class="ba-name-select-button">SELECT BA NAME</button>
                             <div id="baNameDropdown" class="ba-name-dropdown">
@@ -87,54 +88,26 @@
                 <p>⚠️ No data found for the selected criteria, or the search parameters were insufficient.</p>
             </div>
             <div id="dashboardDataDisplay" class="dashboard-content-area" style="display: none;">
-              <!-- The entire left panel is now the flip card container -->
-              <div class="left-panel flip-card">
-                <div class="flip-card-inner">
-                 
-                    <div id="baNameDisplay" class="ba-name-display"></div>
-                    
-                    <div id="payoutInfoPrompt" class="payout-info-prompt" style="display: none;">
-                      (Hover to view Payout Info)
-                    </div>
-
-                    <div class="summary-section"><h4>SUMMARY</h4></div>
-                    <div class="summary-cards-container">
-                      <div class="summary-card"><span class="summary-label">TOTAL REG</span><span class="summary-value" id="totalRegistrationValue">0</span></div>
-                      <div class="summary-card"><span class="summary-label">TOTAL VALID FD</span><span class="summary-value" id="totalValidFdValue">0</span></div>
-                      <div class="summary-card"><span class="summary-label">TOTAL SUSPENDED</span><span class="summary-value" id="totalSuspendedValue">0</span></div>
-                      <div class="summary-card"><span class="summary-label">TOTAL SALARY</span><span class="summary-value" id="totalSalaryValue">0</span></div>
-                      <div class="summary-card"><span class="summary-label">INCENTIVES</span><span class="summary-value" id="totalIncentiveValue">₱0.00</span></div>
-                      <div id="commissionCard" class="summary-card" style="display: none;">
-                        <span class="summary-label">COMMISSION</span>
-                        <span class="summary-value" id="totalCommissionValue">0</span>
-                      </div>
-                    </div>
-                    
-                    <div class="filter-display">
-                      <span id="monthDisplay">MONTH</span>
-                      <span id="weekDisplay">WEEK</span>
-                    </div>
-                    <div id="dateRangeDisplay" class="date-range-display"></div>
-                    <div class="status-display">STATUS: <span id="statusValue">N/A</span></div>
-                    
-                    <!-- BA Ranking is now at the bottom -->
-                    <div class="ba-ranking-section">
-                      <h4>TOP BA RANKING (VALID FD)</h4>
-                      <div id="baRankingList" class="ba-ranking-list"></div>
-                    </div>
-                    
-                  </div>
-                  <!-- Back Side of the Card -->
-                  <div class="flip-card-back">
-                    <h4 class="payout-info-header">PAYOUT INFORMATION</h4>
-                    <div id="payoutInfoDetails" class="payout-info-details">
-                        <!-- Payout text details loaded here by JS -->
-                    </div>
-                    <div id="payoutQrCodeContainer" class="payout-qr-code-container">
-                        <!-- QR Image loaded here by JS -->
-                    </div>
-                    <div class="payout-info-prompt">(Hover to view Summary)</div>
-                  </div>
+              <div class="left-panel">
+                <div id="baNameDisplay" class="ba-name-display"></div>
+                <div class="summary-section"><h4>SUMMARY</h4></div>
+                <div class="summary-cards-container">
+                    <div class="summary-card"><span class="summary-label">TOTAL REG</span><span class="summary-value" id="totalRegistrationValue">0</span></div>
+                    <div class="summary-card"><span class="summary-label">TOTAL VALID FD</span><span class="summary-value" id="totalValidFdValue">0</span></div>
+                    <div class="summary-card"><span class="summary-label">TOTAL SUSPENDED</span><span class="summary-value" id="totalSuspendedValue">0</span></div>
+                    <div class="summary-card"><span class="summary-label">TOTAL SALARY</span><span class="summary-value" id="totalSalaryValue">0</span></div>
+                    <div class="summary-card"><span class="summary-label">INCENTIVES</span><span class="summary-value" id="totalIncentiveValue">₱0.00</span></div>
+                    <div id="commissionCard" class="summary-card" style="display: none;"><span class="summary-label">COMMISSION</span><span class="summary-value" id="totalCommissionValue">0</span></div>
+                </div>
+                <div class="filter-display">
+                    <span id="monthDisplay">MONTH</span>
+                    <span id="weekDisplay">WEEK</span>
+                </div>
+                <div id="dateRangeDisplay" class="date-range-display"></div>
+                <div class="status-display">STATUS: <span id="statusValue">N/A</span></div>
+                <div class="ba-ranking-section">
+                    <h4>TOP BA RANKING (VALID FD)</h4>
+                    <div id="baRankingList" class="ba-ranking-list"></div>
                 </div>
               </div>
               <div class="right-panel">
@@ -147,9 +120,16 @@
               </div>
             </div>
         </div>
+        
+        <!-- NEW TAB FOR VIEWING PAYOUT INFO -->
+        <div id="myPayoutArea" class="tab-content">
+            <div id="myPayoutContent" class="payout-panel-container">
+                <!-- Content will be loaded here by JS -->
+            </div>
+        </div>
 
-        <!-- PAYOUT AREA CONTENT -->
-        <div id="payoutArea" class="tab-content">
+        <!-- Renamed Payout Area to PayoutFormArea -->
+        <div id="payoutFormArea" class="tab-content">
             <div class="payout-panel-container">
                 <h1>Submit Payout Information</h1>
                 <p>Please provide your payment details and upload a QR code image.</p>
