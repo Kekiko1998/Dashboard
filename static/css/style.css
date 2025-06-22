@@ -118,16 +118,14 @@ body.light-mode #homeArea .home-search-controls select { background-image: url('
 #homeArea .home-search-controls-container .error-message-main { color: var(--error-color); font-weight: bold; margin-top:10px; min-height:20px; font-family:var(--roboto-font); font-size:0.9em; text-align:center; width:100%; }
 #dashboardDisplayArea, #salarySchemeArea, #adminArea, #payoutArea { background-color: var(--content-bg); padding: 15px; }
 .dashboard-placeholder-message, .loading-indicator { display: flex; justify-content: center; align-items: center; text-align: center; padding: 40px 20px; font-size: 1.1em; color: var(--text-color-subtle); flex-grow: 1; min-height: 200px; }
-#dashboardDataDisplay.dashboard-content-area { display: flex; gap: 15px; }
+#dashboardDataDisplay.dashboard-content-area { flex-direction: column; display: flex; gap: 15px; }
 
 /* ================== LEFT PANEL FLIP CARD STYLES ================== */
 #dashboardDataDisplay .left-panel.flip-card {
-    width: 350px;
-    background-color: transparent; /* The container is transparent */
-    perspective: 1000px;
-    box-shadow: none;
-    padding: 0;
-}
+    width: 100%;
+    margin-bottom: 15px; /* Add some space between the panels */
+    min-height: auto; /* Let the content determine the height */
+  }
 
 .flip-card-inner {
   position: relative;
