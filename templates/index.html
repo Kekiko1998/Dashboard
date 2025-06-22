@@ -41,39 +41,28 @@
                     <span class="home-subtitle">By Love</span>
                 </div>
                 <div id="homeSearchControlsContainer" class="home-search-controls-container">
-                    <!-- Inside #homeArea -> .home-search-controls-container -> .home-search-controls -->
-<div class="home-search-controls">
-    <select id="monthSelect">
-        <option value="" disabled selected>SELECT MONTH</option>
-        <option value="January">January</option><option value="February">February</option><option value="March">March</option><option value="April">April</option><option value="May">May</option><option value="June">June</option><option value="July">July</option><option value="August">August</option><option value="September">September</option><option value="October">October</option><option value="November">November</option><option value="December">December</option>
-    </select>
-    <select id="weekSelect">
-        <option value="" disabled selected>SELECT WEEK</option>
-        <option value="Week 1">Week 1</option>
-        <option value="Week 2">Week 2</option>
-        <option value="Week 3">Week 3</option>
-        <option value="Week 4">Week 4</option>
-        <option id="week5Option" value="Week 5">Week 5</option>
-    </select>
-    
-    <!-- ================== NEW MULTI-SELECT DROPDOWN SYSTEM ================== -->
-    <div id="baNameSelectContainer" class="ba-name-select-container">
-        <button id="baNameSelectButton" class="ba-name-select-button">SELECT BA NAME</button>
-        <div id="baNameDropdown" class="ba-name-dropdown">
-            <input type="text" id="baNameSearchInput" placeholder="Search names...">
-            <div id="baNameCheckboxList" class="ba-name-checkbox-list">
-                <!-- Checkboxes will be inserted here by JavaScript -->
+                    <div class="home-search-controls">
+                        <select id="monthSelect">
+                            <option value="" disabled selected>SELECT MONTH</option>
+                            <option value="January">January</option><option value="February">February</option><option value="March">March</option><option value="April">April</option><option value="May">May</option><option value="June">June</option><option value="July">July</option><option value="August">August</option><option value="September">September</option><option value="October">October</option><option value="November">November</option><option value="December">December</option>
+                        </select>
+                        <select id="weekSelect">
+                            <option value="" disabled selected>SELECT WEEK</option>
+                            <option value="Week 1">Week 1</option>
+                            <option value="Week 2">Week 2</option>
+                            <option value="Week 3">Week 3</option>
+                            <option value="Week 4">Week 4</option>
+                            <option id="week5Option" value="Week 5">Week 5</option>
+                        </select>
+                        <input type="text" id="baNameInput" placeholder="ENTER BA NAME" autocomplete="off" list="baNameSuggestions">
+                        <datalist id="baNameSuggestions"></datalist>
+                        <input type="text" id="palcodeInput" placeholder="ENTER PALCODE (OPTIONAL)">
+                        <button id="searchButton" class="search-button">SEARCH</button>
+                    </div>
+                    <div id="homeErrorMessage" class="error-message-main"></div>
+                </div>
             </div>
         </div>
-    </div>
-    <!-- ==================================================================== -->
-    
-    <input type="text" id="baNameInput" placeholder="ENTER BA NAME" autocomplete="off" list="baNameSuggestions" style="display: none;">
-    <datalist id="baNameSuggestions"></datalist>
-    
-    <input type="text" id="palcodeInput" placeholder="ENTER PALCODE (OPTIONAL)">
-    <button id="searchButton" class="search-button">SEARCH</button>
-</div>
 
         <!-- DASHBOARD TAB CONTENT -->
         <div id="dashboardDisplayArea" class="tab-content">
