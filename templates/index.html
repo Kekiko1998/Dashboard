@@ -90,12 +90,13 @@
               <!-- The entire left panel is now the flip card container -->
               <div class="left-panel flip-card">
                 <div class="flip-card-inner">
-                  <!-- Front Side of the Card -->
-                  <div class="flip-card-front">
+                 !-- ================== HTML CONTENT REORDERED HERE ================== -->
                     <div id="baNameDisplay" class="ba-name-display"></div>
+                    
                     <div id="payoutInfoPrompt" class="payout-info-prompt" style="display: none;">
                       (Hover to view Payout Info)
                     </div>
+
                     <div class="summary-section"><h4>SUMMARY</h4></div>
                     <div class="summary-cards-container">
                       <div class="summary-card"><span class="summary-label">TOTAL REG</span><span class="summary-value" id="totalRegistrationValue">0</span></div>
@@ -108,16 +109,20 @@
                         <span class="summary-value" id="totalCommissionValue">0</span>
                       </div>
                     </div>
+                    
                     <div class="filter-display">
                       <span id="monthDisplay">MONTH</span>
                       <span id="weekDisplay">WEEK</span>
                     </div>
                     <div id="dateRangeDisplay" class="date-range-display"></div>
                     <div class="status-display">STATUS: <span id="statusValue">N/A</span></div>
+                    
+                    <!-- BA Ranking is now at the bottom -->
                     <div class="ba-ranking-section">
                       <h4>TOP BA RANKING (VALID FD)</h4>
                       <div id="baRankingList" class="ba-ranking-list"></div>
                     </div>
+                    <!-- =================================================================== -->
                   </div>
                   <!-- Back Side of the Card -->
                   <div class="flip-card-back">

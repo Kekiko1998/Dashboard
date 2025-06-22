@@ -207,36 +207,46 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Admin Panel Functions ---
     // ... (This section is correct and unchanged)
     
-    // --- Payout Form & Flip Card Logic ---
     function loadPayoutInfoCard() {
-        if (!leftPanel || !payoutInfoPrompt) return;
+    if (!leftPanel || !payoutInfoPrompt) return;
 
-        leftPanel.classList.remove('has-payout-info');
-        payoutInfoPrompt.style.display = 'none';
+    leftPanel.classList.remove('has-payout-info');
+    payoutInfoPrompt.style.display = 'none';
 
-        if (!userPermissions.has('VIEW_PAYOUT_CARD')) {
-            return;
-        }
-
-        fetch('/api/get_payout_info')
-            .then(res => res.json())
-            .then(payoutData => {
-                if (payoutData.found && payoutData.data) {
-                    const info = payoutData.data;
-                    payoutInfoDetails.innerHTML = `<div><span>BA Name:</span> <strong>${info.ba_name}</strong></div><div><span>Acct. Name:</span> <strong>${info.mop_account_name}</strong></div><div><span>Number:</span> <strong>${info.mop_number}</strong></div>`;
-                    if (info.drive_file_id) {
-                        payoutQrCodeContainer.innerHTML = `<img src="https://drive.google.com/uc?export=view&id=${info.drive_file_id}" alt="QR Code">`;
-                    } else {
-                        payoutQrCodeContainer.innerHTML = `<p class="no-data-message">No QR Image on file.</p>`;
-                    }
-                    leftPanel.classList.add('has-payout-info');
-                    payoutInfoPrompt.style.display = 'block';
-                }
-            })
-            .catch(error => {
-                console.error("Failed to load payout info:", error);
-            });
+    if (!userPermissions.has('VIEW_PAYOUT_CARD')) {
+        return;
     }
+
+    fetch('/api/get_payout_info')
+        .then(res => res.json())
+        .then(payoutData => {
+            if (payoutData.found && payoutData.data) {
+                const info = payoutData.data;
+                
+                payoutInfoDetails.innerHTML = `
+                    <div><span>BA Name:</span> <strong>${info.ba_name}</strong></div>
+                    <div><span>Acct. Name:</span> <strong>${info.mop_account_name}</strong></div>
+                    <div><span>Number:</span> <strong>${info.mop_number}</strong></div>
+                `;
+
+                if (info.drive_file_id) {
+                    // ====================== THIS IS THE FIX ======================
+                    // This new URL format bypasses the viewer and provides the raw image content.
+                    const imageUrl = `https://lh3.googleusercontent.com/d/${info.drive_file_id}`;
+                    payoutQrCodeContainer.innerHTML = `<img src="${imageUrl}" alt="QR Code">`;
+                    // =============================================================
+                } else {
+                    payoutQrCodeContainer.innerHTML = `<p class="no-data-message">No QR Image on file.</p>`;
+                }
+
+                leftPanel.classList.add('has-payout-info');
+                payoutInfoPrompt.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            console.error("Failed to load payout info:", error);
+        });
+}
 
     if (payoutImageInput) {
         payoutImageInput.addEventListener('change', function() {
