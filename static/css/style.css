@@ -445,8 +445,8 @@ input:checked + .slider:before {
 .payout-form-container button:hover { background: var(--primary-blue-darker);}
 #payoutFormStatus { margin-left: 10px; font-size: 0.95em; color: var(--primary-blue);}
 .payout-card {
-    background: var(--panel-bg);
-    border: 1px solid var(--table-border-color);
+    background: var(--panel-bg, #222);
+    border: 1px solid var(--table-border-color, #444);
     border-radius: 6px;
     padding: 15px;
     margin-bottom: 15px;

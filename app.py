@@ -403,11 +403,10 @@ def submit_payout():
     if not all([ba_name, mop_account_name, mop_number, qr_file]):
         return jsonify({'success': False, 'error': 'All fields are required.'}), 400
 
-    filename = f"{uuid.uuid4().hex}_{secure_filename(qr_file.filename)}"
+    filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{qr_file.filename}"
     file_path = os.path.join(PAYOUT_UPLOAD_FOLDER, filename)
     qr_file.save(file_path)
 
-    # Save payout info to a local JSON file (or database)
     payout_info_path = os.path.join(PAYOUT_UPLOAD_FOLDER, 'payout_submissions.json')
     try:
         if os.path.exists(payout_info_path):
@@ -426,7 +425,6 @@ def submit_payout():
         with open(payout_info_path, 'w', encoding='utf-8') as f:
             json.dump(submissions, f, indent=2)
     except Exception as e:
-        logging.error(f"Error saving payout info: {e}")
         return jsonify({'success': False, 'error': 'Failed to save payout info.'}), 500
 
     return jsonify({'success': True, 'message': 'Payout info submitted successfully.'})
@@ -434,7 +432,7 @@ def submit_payout():
 @app.route('/api/payout/list', methods=['GET'])
 @login_required
 def list_payouts():
-    if not current_user.is_admin:
+    if not getattr(current_user, 'is_admin', False):
         return jsonify({'success': False, 'error': 'Forbidden'}), 403
     payout_info_path = os.path.join(PAYOUT_UPLOAD_FOLDER, 'payout_submissions.json')
     if not os.path.exists(payout_info_path):
