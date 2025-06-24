@@ -113,9 +113,9 @@ def calculate_date_range(month_name, week_str):
         start_month_name = selected_week_start_date.strftime('%B')
         end_month_name = selected_week_end_date.strftime('%B')
         if start_month_name == end_month_name:
-            return f"{selected_week_start_date.strftime('%b %d')} - {selected_week_end_date.strftime('%d, %Y')}"
+            return f"{selected_week_start_date.strftime('%b %d')} - {selected_week_end_date.strftime('%d')}"
         else:
-            return f"{selected_week_start_date.strftime('%b %d')} - {selected_week_end_date.strftime('%b %d, %Y')}"
+            return f"{selected_week_start_date.strftime('%b %d')} - {selected_week_end_date.strftime('%b %d')}"
     except Exception as e:
         logging.error(f"Error in calculate_date_range: {e}")
         return ""
