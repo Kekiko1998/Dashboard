@@ -108,29 +108,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Multi-select BA Name logic
     if (baNameSelectButton) {
-        baNameSelectButton.addEventListener('click', () => {
+        baNameSelectButton.addEventListener('click', function(e) {
             baNameDropdown.classList.toggle('show');
+            e.stopPropagation();
         });
     }
-
     if (baNameSearchInput) {
-        baNameSearchInput.addEventListener('keyup', () => {
-            const filter = baNameSearchInput.value.toUpperCase();
-            const labels = baNameCheckboxList.getElementsByTagName('label');
-            for (let i = 0; i < labels.length; i++) {
-                const txtValue = labels[i].textContent || labels[i].innerText;
-                if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                    labels[i].style.display = "flex";
-                } else {
-                    labels[i].style.display = "none";
-                }
-            }
+        baNameSearchInput.addEventListener('input', function() {
+            const filter = baNameSearchInput.value.toLowerCase();
+            Array.from(baNameCheckboxList.children).forEach(label => {
+                label.style.display = label.textContent.toLowerCase().includes(filter) ? '' : 'none';
+            });
         });
     }
-
     window.addEventListener('click', function(e) {
-        if (baNameSelectContainer && !baNameSelectContainer.contains(e.target)) {
+        if (baNameDropdown && !baNameDropdown.contains(e.target) && !baNameSelectButton.contains(e.target)) {
             baNameDropdown.classList.remove('show');
         }
     });

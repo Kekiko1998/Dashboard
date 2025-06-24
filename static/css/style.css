@@ -455,3 +455,20 @@ input:checked + .slider:before {
     max-width: 420px;
 }
 .payout-card img { margin-top: 8px; border-radius: 4px; }
+.ba-dropdown {
+  display: none;
+  position: absolute;
+  background: var(--panel-bg, #222);
+  border: 1px solid var(--input-border-color, #444);
+  border-radius: 4px;
+  z-index: 100;
+  width: 250px;
+  max-height: 300px;
+  overflow-y: auto;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  margin-top: 5px;
+}
+.ba-dropdown.show { display: block; }
+#baNameSearchInput { width: 90%; margin: 8px; padding: 5px; }
+#baNameCheckboxList label { display: block; padding: 4px 8px; cursor: pointer; }
+#baNameCheckboxList label:hover { background: var(--primary-blue, #007bff); color: #fff; }
