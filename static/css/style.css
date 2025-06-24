@@ -44,6 +44,7 @@ body {
   --tab-active-bg: var(--primary-blue);
   --tab-active-text: var(--header-text-color);
   --error-color: #f07178;
+  --error-color-darker: #d9534f;
 }
 
 /* --- Light Mode styles are applied when this class is added to the body --- */
@@ -67,6 +68,7 @@ body.light-mode {
   --tab-inactive-bg: #e9ecef;
   --tab-inactive-text: #495057;
   --error-color: #dc3545;
+  --error-color-darker: #c82333;
 }
 
 /* --- Base and Layout Styles --- */
@@ -308,91 +310,28 @@ input:checked + .slider:before { transform: translateX(22px); }
 .slider.round:before { border-radius: 50%; }
 
 /* --- Payout Form & Card Styles --- */
-#payoutArea {
-    flex-direction: column;
-    align-items: center;
-}
+#payoutArea { flex-direction: column; align-items: center; }
 .payout-form-container { width: 100%; max-width: 450px; margin: 0 auto; background: var(--panel-bg); padding: 20px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
 .payout-form-container label { display:block; margin-bottom:10px; font-family:var(--roboto-font);}
 .payout-form-container input[type="text"], .payout-form-container input[type="file"] { width: 100%; box-sizing: border-box; margin-top: 3px; margin-bottom: 10px; padding: 7px; border-radius: 3px; border: 1px solid var(--input-border-color); }
 .payout-form-container button { padding: 8px 18px; border-radius: 3px; background: var(--primary-blue); color: #fff; border: none; font-family: var(--bebas-font); font-size: 1.1em; cursor: pointer;}
 .payout-form-container button:hover { background: var(--primary-blue-darker);}
 #payoutFormStatus { margin-left: 10px; font-size: 0.95em; color: var(--primary-blue);}
-
-/* *** FIX: Added responsive grid layout for payout cards *** */
-#payoutInfoCards {
-    width: 100%;
-    max-width: 1400px;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 20px;
-    margin-top: 2em;
-}
-
-@media (min-width: 1500px) {
-    #payoutInfoCards {
-        grid-template-columns: repeat(4, 1fr);
-    }
-}
-
-.no-payouts-message {
-    grid-column: 1 / -1; /* Span all columns */
-    text-align: center;
-    color: var(--text-color-subtle);
-    font-size: 1.1em;
-}
-
-.payout-card {
-    background: var(--panel-bg, #222);
-    border: 1px solid var(--table-border-color, #444);
-    border-radius: 6px;
-    padding: 15px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.07);
-    font-family: var(--roboto-font);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden; /* Important for containing children */
-}
-.payout-card div {
-    line-height: 1.5;
-    font-size: 0.9em;
-    word-break: break-all; /* Break long emails or names */
-}
-.payout-card img {
-    max-width: 100%;
-    height: auto;
-    display: block;
-    margin-top: 15px;
-    border-radius: 4px;
-}
+#payoutInfoCards { width: 100%; max-width: 1400px; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; margin-top: 2em; }
+@media (min-width: 1500px) { #payoutInfoCards { grid-template-columns: repeat(4, 1fr); } }
+.no-payouts-message { grid-column: 1 / -1; text-align: center; color: var(--text-color-subtle); font-size: 1.1em; }
+.payout-card { background: var(--panel-bg, #222); border: 1px solid var(--table-border-color, #444); border-radius: 6px; padding: 15px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); font-family: var(--roboto-font); display: flex; flex-direction: column; overflow: hidden; }
+.payout-card div { line-height: 1.5; font-size: 0.9em; word-break: break-all; }
+.payout-card img { max-width: 100%; height: auto; display: block; margin-top: 15px; border-radius: 4px; }
+.delete-payout-btn { margin-top: 1rem; padding: 8px 12px; font-family: var(--bebas-font); font-size: 1em; letter-spacing: 0.5px; background-color: var(--error-color); color: var(--header-text-color); border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }
+.delete-payout-btn:hover { background-color: var(--error-color-darker); }
+.delete-payout-btn:disabled { background-color: #5a6268; cursor: not-allowed; opacity: 0.7; }
 
 /* --- Multi-Select BA Name Dropdown --- */
 .ba-name-select-wrapper { position: relative; }
-#baNameSelectButton {
-    font-family: var(--bebas-font);
-    font-size: 1rem;
-    letter-spacing: 0.5px;
-    padding: 8px 10px;
-    border: 1px solid var(--input-border-color);
-    border-radius: 3px;
-    width: 100%;
-    box-sizing: border-box;
-    text-transform: uppercase;
-    background-color: var(--input-bg);
-    color: var(--input-placeholder-color);
-    transition: background-color 0.3s, color 0.3s, border-color 0.3s;
-    text-align: left;
-    cursor: pointer;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
+#baNameSelectButton { font-family: var(--bebas-font); font-size: 1rem; letter-spacing: 0.5px; padding: 8px 10px; border: 1px solid var(--input-border-color); border-radius: 3px; width: 100%; box-sizing: border-box; text-transform: uppercase; background-color: var(--input-bg); color: var(--input-placeholder-color); transition: background-color 0.3s, color 0.3s, border-color 0.3s; text-align: left; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #baNameSelectButton.has-selection { color: var(--input-text); }
-.top-left-dynamic-content #baNameSelectButton {
-    font-size: 0.9em;
-    padding: 6px 9px;
-    color: var(--input-text);
-}
+.top-left-dynamic-content #baNameSelectButton { font-size: 0.9em; padding: 6px 9px; color: var(--input-text); }
 .ba-dropdown { display: none; position: absolute; background: var(--panel-bg, #222); border: 1px solid var(--input-border-color, #444); border-radius: 4px; z-index: 1001; width: 250px; max-height: 300px; overflow-y: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.15); margin-top: 5px; }
 .ba-dropdown.show { display: block; }
 #baNameSearchInput { width: calc(100% - 20px); box-sizing: border-box; margin: 8px; padding: 5px; background-color: var(--body-bg); border: 1px solid var(--input-border-color); color: var(--input-text); border-radius: 3px; }

@@ -9,6 +9,7 @@ from google_auth_oauthlib.flow import Flow
 import logging
 import requests
 import pytz
+import uuid
 from werkzeug.utils import secure_filename
 
 # --- Basic Logging Setup ---
@@ -20,9 +21,7 @@ DATABASE_SHEET_NAME = 'DATABASE'
 LOGS_SHEET_ID = '1ZufXPOUcoW2czQ0vcpZwvJNHngV4GHbbSl9q46UwF8g'
 LOGS_SHEET_NAME = 'Web App Logs'
 USERS_SHEET_NAME = 'Users'
-# Root admins have hardcoded admin rights and cannot be changed via the UI.
-ADMIN_USER_EMAILS = ['harrypobreza@gmail.com']
-# Define all controllable features here
+ADMIN_USER_EMAILS = ['harrypobreza@gmail.com'] 
 ALL_PERMISSIONS = {
     'MULTI_SELECT',
     'SEARCH_ALL',
@@ -30,11 +29,7 @@ ALL_PERMISSIONS = {
     'VIEW_COMMISSION'
 }
 YOUR_TIMEZONE = 'Asia/Manila'
-# --- IMPORTANT ---
-# The Payout feature saves files to the local server disk. This will NOT work on ephemeral
-# filesystems like Heroku, Google App Engine, AWS Lambda, etc. For production, you should
-# switch to a cloud storage service like Google Cloud Storage or AWS S3.
-PAYOUT_UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'payout_uploads')
+PAYOUT_UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'payout_uploads')
 
 # --- Flask App Initialization ---
 app = Flask(__name__)
@@ -52,10 +47,9 @@ class User(UserMixin):
         self.name = name
         self.email = email
         self.is_admin = is_admin
-        # If user is admin, they get all permissions. Otherwise, use the permissions passed.
         self.permissions = ALL_PERMISSIONS if is_admin else (permissions or set())
 
-users = {}
+users = {} 
 @login_manager.user_loader
 def load_user(user_id):
     return users.get(user_id)
@@ -96,7 +90,7 @@ def get_sheet_data(sheet_id, sheet_name_range):
     except Exception as e:
         logging.error(f"Error fetching sheet data for range '{sheet_name_range}': {e}")
         return None
-
+        
 def calculate_date_range(month_name, week_str):
     try:
         month_map = { "January": 1, "February": 2, "March": 3, "April": 4, "May": 5, "June": 6, "July": 7, "August": 8, "September": 9, "October": 10, "November": 11, "December": 12 }
@@ -148,22 +142,17 @@ def callback():
     credentials = flow.credentials
     user_info_response = requests.get('https://www.googleapis.com/oauth2/v3/userinfo', headers={'Authorization': f'Bearer {credentials.token}'})
     user_info = user_info_response.json()
-
     user_id = user_info.get('sub')
     user_email = user_info.get('email', '').lower()
     user_name = user_info.get('name')
-
     user_data = get_sheet_data(DATABASE_SHEET_ID, f"{USERS_SHEET_NAME}!A:E") or []
-    user_map = {row[1].lower(): row for row in user_data[1:] if len(row) > 1 and row[1]}
-
+    user_map = {row[1].lower(): row for row in user_data[1:] if len(row) > 1}
     is_admin = user_email in [email.lower() for email in ADMIN_USER_EMAILS]
     permissions = set()
     if user_email in user_map:
         row = user_map[user_email]
-        # Check if the row has a permissions column (E, index 4) and it's not empty
         if len(row) > 4 and row[4]:
-            permissions = set(p.strip() for p in row[4].split(","))
-
+            permissions = set(row[4].split(","))
     user = User(id=user_id, name=user_name, email=user_email, is_admin=is_admin, permissions=permissions)
     users[user_id] = user
     login_user(user)
@@ -191,22 +180,18 @@ def get_user_info():
 def get_all_users():
     if not current_user.is_admin:
         return jsonify({'error': 'Forbidden'}), 403
-    user_data = get_sheet_data(DATABASE_SHEET_ID, f"{USERS_SHEET_NAME}!A:E")
+    user_data = get_sheet_data(DATABASE_SHEET_ID, f"{USERS_SHEET_NAME}!B:E")
     if not user_data or len(user_data) < 2:
         return jsonify({'users': [], 'all_permissions': list(ALL_PERMISSIONS)})
-
     users_list = []
-    # Skip header row (index 0)
     for row in user_data[1:]:
-        # Ensure row has at least Name (A) and Email (B)
-        if len(row) >= 2 and row[1]:
+        if len(row) >= 2:
             users_list.append({
                 'name': row[0],
                 'email': row[1],
-                'is_admin': row[1].lower() in [e.lower() for e in ADMIN_USER_EMAILS],
-                'permissions': row[4].split(",") if len(row) > 4 and row[4] else []
+                'permissions': row[3].split(",") if len(row) > 3 and row[3] else []
             })
-    return jsonify({"users": users_list, "all_permissions": sorted(list(ALL_PERMISSIONS))})
+    return jsonify({"users": users_list, "all_permissions": list(ALL_PERMISSIONS)})
 
 @app.route('/api/update_user_permission', methods=['POST'])
 @login_required
@@ -218,22 +203,21 @@ def update_user_permission():
     new_permissions = data.get('permissions', [])
     if not target_email:
         return jsonify({'error': 'Missing email'}), 400
-    if target_email in [email.lower() for email in ADMIN_USER_EMAILS]:
-        return jsonify({'error': 'Cannot change root admin permissions'}), 403
-
     user_data = get_sheet_data(DATABASE_SHEET_ID, f"{USERS_SHEET_NAME}!A:E")
     if not user_data:
         return jsonify({'error': 'User data not found'}), 404
-
     row_index_to_update = -1
+    is_target_root_admin = False
     for i, row in enumerate(user_data):
         if len(row) > 1 and row[1].lower() == target_email:
-            row_index_to_update = i + 1 # 1-based index for sheets
+            row_index_to_update = i + 1
+            if row[1].lower() in [email.lower() for email in ADMIN_USER_EMAILS]:
+                is_target_root_admin = True
             break
-
     if row_index_to_update == -1:
         return jsonify({'error': 'User not found'}), 404
-
+    if is_target_root_admin:
+        return jsonify({'error': 'Cannot change root admin permissions'}), 403
     permissions_string = ",".join(sorted(new_permissions))
     range_to_update = f"{USERS_SHEET_NAME}!E{row_index_to_update}"
     sheet_api.values().update(
@@ -247,10 +231,10 @@ def update_user_permission():
 @app.route('/api/ba-names', methods=['GET'])
 @login_required
 def get_unique_ba_names():
-    data = get_sheet_data(DATABASE_SHEET_ID, f"{DATABASE_SHEET_NAME}!D:D") # Fetch only the BA Name column
+    data = get_sheet_data(DATABASE_SHEET_ID, f"{DATABASE_SHEET_NAME}!A:L")
     if not data or len(data) <= 1:
         return jsonify([])
-    ba_names = set(row[0].strip() for row in data[1:] if row and row[0]) # More robust check
+    ba_names = set(row[3].strip() for row in data[1:] if len(row) > 3 and row[3])
     return jsonify(sorted(list(ba_names)))
 
 @app.route('/api/search', methods=['POST'])
@@ -272,23 +256,17 @@ def search_dashboard_data():
     search_month, search_week = month.strip().lower(), week.strip().lower()
     search_ba_names_lower = [str(name).strip().lower() for name in ba_names if name]
     search_palcode_lower = palcode.strip().lower() if palcode else ""
-
     PALCODE, MONTH, WEEK, BA_NAME, REG, VALID_FD, SUSPENDED_FD, RATE, GGR_PER_FD, TOTAL_GGR, SALARY, STATUS = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
-
     period_data_rows = [row for row in all_sheet_data[1:] if len(row) > WEEK and row[MONTH].strip().lower() == search_month and row[WEEK].strip().lower() == search_week]
-
     ba_display_name = "ALL BAs" if 'SEARCH_ALL' in current_user.permissions and not search_ba_names_lower else (f"MULTIPLE BAs ({len(search_ba_names_lower)})" if len(search_ba_names_lower) > 1 else (ba_names[0].strip().upper() if search_ba_names_lower else "N/A"))
     search_criteria_frontend = {'baNames': [name.strip().upper() for name in ba_names]}
     date_range_display = calculate_date_range(month, week)
-
     utc_now = datetime.now(pytz.utc)
     local_tz = pytz.timezone(YOUR_TIMEZONE)
     local_now = utc_now.astimezone(local_tz)
     last_update_timestamp = local_now.strftime('%A, %B %d, %Y, %I:%M:%S %p')
-
     if not period_data_rows:
         return jsonify({ "baNameDisplay": ba_display_name, "searchCriteria": search_criteria_frontend, "summary": {"totalRegistration": 0, "totalValidFd": 0, "totalSuspended": 0, "totalSalary": 0, "totalIncentives": 0, "totalCommission": 0}, "monthDisplay": search_month.upper(), "weekDisplay": search_week.upper(), "dateRangeDisplay": date_range_display, "status": "N/A", "resultsTable": [], "rankedBaList": [], "lastUpdate": last_update_timestamp, "message": "No records for selected period." })
-
     overall_total_valid_fd, ba_period_fds = 0, {}
     for row in period_data_rows:
         try:
@@ -297,7 +275,6 @@ def search_dashboard_data():
             if ba_name not in ba_period_fds: ba_period_fds[ba_name] = {"originalName": ba_name, "totalFd": 0}
             ba_period_fds[ba_name]["totalFd"] += current_fd
         except (ValueError, IndexError): continue
-
     final_ranked_ba_list = sorted(ba_period_fds.values(), key=lambda x: x['totalFd'], reverse=True)
     ba_incentives_map, sum_of_all_individual_incentives = {}, 0
     if overall_total_valid_fd >= 6000:
@@ -311,14 +288,12 @@ def search_dashboard_data():
             if incentive > 0:
                 ba_incentives_map[ba['originalName'].upper()] = incentive
                 sum_of_all_individual_incentives += incentive
-
     filtered_rows = [row for row in period_data_rows if ((not search_ba_names_lower or (len(row) > BA_NAME and row[BA_NAME].strip().lower() in search_ba_names_lower)) and (not search_palcode_lower or (len(row) > PALCODE and row[PALCODE].strip().lower() == search_palcode_lower)))]
-
+    results_for_table = filtered_rows
     commission_map = { 25.00: 5, 60.00: 10, 80.00: 20, 90.00: 10, 140.00: 10, 230.00: 20, 325.00: 25, 420.00: 30 }
-    results_for_table, summary_for_display = [], {"totalRegistration": 0, "totalValidFd": 0, "totalSuspended": 0, "totalSalary": 0, "totalIncentives": 0, "totalCommission": 0}
+    summary_for_display = {"totalRegistration": 0, "totalValidFd": 0, "totalSuspended": 0, "totalSalary": 0, "totalIncentives": 0, "totalCommission": 0}
     for row in filtered_rows:
         try:
-            results_for_table.append(row)
             summary_for_display['totalRegistration'] += to_float(row[REG]) if len(row) > REG else 0
             summary_for_display['totalValidFd'] += to_float(row[VALID_FD]) if len(row) > VALID_FD else 0
             summary_for_display['totalSuspended'] += to_float(row[SUSPENDED_FD]) if len(row) > SUSPENDED_FD else 0
@@ -328,11 +303,11 @@ def search_dashboard_data():
                 current_rate = to_float(row[RATE]) if len(row) > RATE else 0
                 commission_multiplier = commission_map.get(current_rate, 0)
                 summary_for_display['totalCommission'] += (current_fd * commission_multiplier)
-        except IndexError as e: logging.warning(f"Skipping row due to missing columns: {row} -> {e}")
+        except IndexError as e: 
+            logging.warning(f"Skipping row during summary calculation due to missing columns: {row} -> {e}")
     if overall_total_valid_fd >= 6000:
         if search_ba_names_lower: summary_for_display['totalIncentives'] = sum(ba_incentives_map.get(name.upper(), 0) for name in ba_names)
         elif 'SEARCH_ALL' in current_user.permissions: summary_for_display['totalIncentives'] = sum_of_all_individual_incentives
-
     return jsonify({ "baNameDisplay": ba_display_name, "searchCriteria": search_criteria_frontend, "summary": summary_for_display, "monthDisplay": search_month.upper(), "weekDisplay": search_week.upper(), "dateRangeDisplay": date_range_display, "status": "Active", "resultsTable": results_for_table, "rankedBaList": final_ranked_ba_list, "lastUpdate": last_update_timestamp })
 
 @app.route('/api/save_dashboard', methods=['POST'])
@@ -347,9 +322,8 @@ def save_dashboard():
         all_sheet_data = get_sheet_data(DATABASE_SHEET_ID, f"{DATABASE_SHEET_NAME}!A:L")
         if not all_sheet_data:
             return jsonify({"success": False, "error": "Could not fetch current database state."}), 500
-        palcode_map = {row[0]: {'data': row, 'index': i + 1} for i, row in enumerate(all_sheet_data) if row and row[0]}
+        palcode_map = {row[0]: {'data': row, 'index': i + 1} for i, row in enumerate(all_sheet_data) if row}
         update_requests = []
-        # *** FIX: Added 'status' to the editable columns dictionary ***
         editable_cols = {
             'month': {'idx': 1, 'col': 'B'}, 'week': {'idx': 2, 'col': 'C'}, 'ba_name': {'idx': 3, 'col': 'D'},
             'reg': {'idx': 4, 'col': 'E'}, 'valid_fd': {'idx': 5, 'col': 'F'}, 'suspended_fd': {'idx': 6, 'col': 'G'},
@@ -362,7 +336,6 @@ def save_dashboard():
                 original_index = palcode_map[palcode]['index']
                 for field, col_info in editable_cols.items():
                     col_idx = col_info['idx']
-                    # Ensure original_row is long enough before accessing index
                     original_value = original_row[col_idx] if len(original_row) > col_idx else ""
                     client_value = client_row.get(field, "")
                     if str(original_value).strip() != str(client_value).strip():
@@ -372,20 +345,15 @@ def save_dashboard():
                         })
         if not update_requests:
             return jsonify({"success": True, "message": "No changes detected to save."})
-        batch_update_body = {
-            'valueInputOption': 'USER_ENTERED',
-            'data': update_requests
-        }
-        sheet_api.values().batchUpdate(
-            spreadsheetId=DATABASE_SHEET_ID,
-            body=batch_update_body
-        ).execute()
+        batch_update_body = { 'valueInputOption': 'USER_ENTERED', 'data': update_requests }
+        sheet_api.values().batchUpdate(spreadsheetId=DATABASE_SHEET_ID, body=batch_update_body).execute()
         log_user_event('saveDashboardData', {'updated_palcodes': [r['palcode'] for r in updated_rows_from_client]})
         return jsonify({"success": True, "message": f"Successfully updated {len(update_requests)} cells."})
     except Exception as e:
         logging.error(f"Error saving dashboard data: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+# *** MODIFIED ***: Payout submission now overwrites previous entries by the same user.
 @app.route('/api/payout/submit', methods=['POST'])
 @login_required
 def submit_payout():
@@ -397,45 +365,108 @@ def submit_payout():
     if not all([ba_name, mop_account_name, mop_number, qr_file]):
         return jsonify({'success': False, 'error': 'All fields are required.'}), 400
 
-    filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(qr_file.filename)}"
-    file_path = os.path.join(PAYOUT_UPLOAD_FOLDER, filename)
-    qr_file.save(file_path)
-
-    # --- IMPORTANT ---
-    # Storing submission metadata in a single JSON file is not ideal for multi-user applications
-    # as it can lead to race conditions. For production, consider writing this data to a
-    # database or a separate Google Sheet.
     payout_info_path = os.path.join(PAYOUT_UPLOAD_FOLDER, 'payout_submissions.json')
+    submissions = []
+    was_overwritten = False
+    
     try:
-        submissions = []
+        # Load existing submissions if the file exists
         if os.path.exists(payout_info_path):
             with open(payout_info_path, 'r', encoding='utf-8') as f:
                 submissions = json.load(f)
+        
+        # Check for and remove any existing submission from the current user
+        current_user_email = current_user.email
+        existing_submission = next((sub for sub in submissions if sub.get('user_email') == current_user_email), None)
+        
+        if existing_submission:
+            was_overwritten = True
+            # Delete the old QR image file
+            old_qr_filename = existing_submission.get('qr_image')
+            if old_qr_filename:
+                old_file_path = os.path.join(PAYOUT_UPLOAD_FOLDER, old_qr_filename)
+                try:
+                    os.remove(old_file_path)
+                    logging.info(f"Overwriting: Deleted old QR image {old_file_path}")
+                except FileNotFoundError:
+                    logging.warning(f"Old QR image not found during overwrite: {old_file_path}")
+            
+            # Filter out the old submission
+            submissions = [sub for sub in submissions if sub.get('user_email') != current_user_email]
 
+        # Save the new QR file
+        filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(qr_file.filename)}"
+        file_path = os.path.join(PAYOUT_UPLOAD_FOLDER, filename)
+        qr_file.save(file_path)
+
+        # Add the new submission
         submissions.append({
-            'user_email': current_user.email,
+            'user_email': current_user_email,
             'ba_name': ba_name,
             'mop_account_name': mop_account_name,
             'mop_number': mop_number,
             'qr_image': filename,
             'submitted_at': datetime.now().isoformat()
         })
+        
+        # Write the updated list back to the file
         with open(payout_info_path, 'w', encoding='utf-8') as f:
             json.dump(submissions, f, indent=2)
 
     except Exception as e:
-        logging.error(f"Failed to save payout info: {e}")
-        # Clean up saved file if JSON write fails
-        if os.path.exists(file_path):
-            os.remove(file_path)
+        logging.error(f"Error during payout submission: {e}")
         return jsonify({'success': False, 'error': 'Failed to save payout info.'}), 500
+    
+    message = "Payout info updated successfully. Your previous submission was overwritten." if was_overwritten else "Payout info submitted successfully."
+    return jsonify({'success': True, 'message': message})
 
-    return jsonify({'success': True, 'message': 'Payout info submitted successfully.'})
+@app.route('/api/payout/delete', methods=['POST'])
+@login_required
+def delete_payout():
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'error': 'Forbidden'}), 403
+    data = request.get_json()
+    payout_id = data.get('id')
+    if not payout_id:
+        return jsonify({'success': False, 'error': 'Payout ID is required.'}), 400
+    payout_info_path = os.path.join(PAYOUT_UPLOAD_FOLDER, 'payout_submissions.json')
+    try:
+        with open(payout_info_path, 'r', encoding='utf-8') as f:
+            submissions = json.load(f)
+    except FileNotFoundError:
+        return jsonify({'success': False, 'error': 'Submissions file not found.'}), 404
+    except json.JSONDecodeError:
+        return jsonify({'success': False, 'error': 'Could not read submissions file.'}), 500
+    payout_to_delete = None
+    for p in submissions:
+        if p.get('submitted_at') == payout_id:
+            payout_to_delete = p
+            break
+    if not payout_to_delete:
+        return jsonify({'success': False, 'error': 'Payout submission not found.'}), 404
+    qr_filename = payout_to_delete.get('qr_image')
+    if qr_filename:
+        file_path = os.path.join(PAYOUT_UPLOAD_FOLDER, qr_filename)
+        try:
+            os.remove(file_path)
+            logging.info(f"Deleted image file: {file_path}")
+        except FileNotFoundError:
+            logging.warning(f"Image file not found for deletion: {file_path}")
+        except Exception as e:
+            logging.error(f"Error deleting image file {file_path}: {e}")
+    updated_submissions = [p for p in submissions if p.get('submitted_at') != payout_id]
+    try:
+        with open(payout_info_path, 'w', encoding='utf-8') as f:
+            json.dump(updated_submissions, f, indent=2)
+    except Exception as e:
+        logging.error(f"Error writing updated submissions file: {e}")
+        return jsonify({'success': False, 'error': 'Could not update submissions file.'}), 500
+    return jsonify({'success': True, 'message': 'Submission deleted successfully.'})
 
 @app.route('/api/payout/list', methods=['GET'])
 @login_required
 def list_payouts():
-    if not current_user.is_admin:
+    if not getattr(current_user, 'is_admin', False):
         return jsonify({'success': False, 'error': 'Forbidden'}), 403
     payout_info_path = os.path.join(PAYOUT_UPLOAD_FOLDER, 'payout_submissions.json')
     if not os.path.exists(payout_info_path):
@@ -443,34 +474,30 @@ def list_payouts():
     try:
         with open(payout_info_path, 'r', encoding='utf-8') as f:
             submissions = json.load(f)
-        return jsonify({'success': True, 'payouts': submissions})
-    except (json.JSONDecodeError, IOError) as e:
-        logging.error(f"Could not read payout submissions file: {e}")
-        return jsonify({'success': False, 'error': 'Could not load payout data.'}), 500
+    except (json.JSONDecodeError, FileNotFoundError):
+        return jsonify({'success': True, 'payouts': []})
+    return jsonify({'success': True, 'payouts': submissions})
 
 @app.route('/uploads/<filename>')
 @login_required
 def uploaded_file(filename):
-    # Only admins should be able to see uploaded files
-    if not current_user.is_admin:
-        return "Forbidden", 403
     return send_from_directory(PAYOUT_UPLOAD_FOLDER, filename)
 
 # Logging Function
 SHEET_ID_CACHE = {}
 def _get_sheet_id_by_name(spreadsheet_id, sheet_name):
     """Gets the numeric ID of a sheet by its name, using a cache."""
-    cache_key = (spreadsheet_id, sheet_name)
-    if cache_key in SHEET_ID_CACHE:
-        return SHEET_ID_CACHE[cache_key]
-
+    if spreadsheet_id in SHEET_ID_CACHE and sheet_name in SHEET_ID_CACHE[spreadsheet_id]:
+        return SHEET_ID_CACHE[spreadsheet_id][sheet_name]
     try:
         spreadsheet_metadata = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
         for sheet in spreadsheet_metadata.get('sheets', []):
             props = sheet.get('properties', {})
             if props.get('title') == sheet_name:
                 sheet_id = props.get('sheetId')
-                SHEET_ID_CACHE[cache_key] = sheet_id
+                if spreadsheet_id not in SHEET_ID_CACHE:
+                    SHEET_ID_CACHE[spreadsheet_id] = {}
+                SHEET_ID_CACHE[spreadsheet_id][sheet_name] = sheet_id
                 return sheet_id
         return None
     except Exception as e:
@@ -480,39 +507,28 @@ def _get_sheet_id_by_name(spreadsheet_id, sheet_name):
 def log_user_event(function_name, inputs):
     if not sheet_api: return
     try:
-        # Use a different sheet ID and name for logging
-        logs_sheet_id_numeric = _get_sheet_id_by_name(LOGS_SHEET_ID, LOGS_SHEET_NAME)
-        if logs_sheet_id_numeric is None:
+        logs_sheet_id = _get_sheet_id_by_name(LOGS_SHEET_ID, LOGS_SHEET_NAME)
+        if logs_sheet_id is None:
             logging.error(f"Could not find sheet named '{LOGS_SHEET_NAME}' to log event.")
             return
-
         utc_now = datetime.now(pytz.utc)
         local_tz = pytz.timezone(YOUR_TIMEZONE)
         local_now = utc_now.astimezone(local_tz)
         timestamp = local_now.strftime('%A, %B %d, %Y, %I:%M:%S %p')
         user_email = current_user.email if current_user.is_authenticated else "Anonymous"
-
         if function_name == 'saveDashboardData':
             formatted_inputs = f"Updated data for {len(inputs.get('updated_palcodes', []))} palcodes."
         else:
             ba_names_str = ', '.join(inputs.get('baNames', [])) if inputs.get('baNames') else "N/A"
             formatted_inputs = f"Month - {inputs.get('month', 'N/A')}, Week - {inputs.get('week', 'N/A').replace('week ', '')}, Ba Name(s) - {ba_names_str}, Palcode - {inputs.get('palcode', 'N/A') or 'N/A'}"
-
         new_row_data = [timestamp, user_email, function_name, formatted_inputs]
-
-        # Use the simpler append method for logging
-        sheet_api.values().append(
-            spreadsheetId=LOGS_SHEET_ID,
-            range=f"'{LOGS_SHEET_NAME}'!A1",
-            valueInputOption='USER_ENTERED',
-            insertDataOption='INSERT_ROWS',
-            body={'values': [new_row_data]}
-        ).execute()
-
+        requests_body = [
+            { "insertDimension": { "range": { "sheetId": logs_sheet_id, "dimension": "ROWS", "startIndex": 1, "endIndex": 2 } } },
+            { "updateCells": { "rows": [ { "values": [ {"userEnteredValue": {"stringValue": str(cell)}} for cell in new_row_data ] } ], "fields": "userEnteredValue", "start": { "sheetId": logs_sheet_id, "rowIndex": 1, "columnIndex": 0 } } }
+        ]
+        sheet_api.batchUpdate(spreadsheetId=LOGS_SHEET_ID, body={'requests': requests_body}).execute()
     except Exception as e:
-        # Fallback from complex logging to simple append to avoid breaking the main app flow
-        logging.error(f"Error logging event: {e}")
-
+        logging.error(f"Error logging event by inserting row: {e}")
 
 if __name__ == '__main__':
     os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'

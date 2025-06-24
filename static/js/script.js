@@ -24,7 +24,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const tableControls = document.getElementById('tableControls');
     const saveButton = document.getElementById('saveButton');
     const saveStatusMessage = document.getElementById('saveStatusMessage');
-    // New Dropdown Multi-Select Elements
     const baNameSelectContainer = document.getElementById('baNameSelectContainer');
     const baNameSelectButton = document.getElementById('baNameSelectButton');
     const baNameDropdown = document.getElementById('baNameDropdown');
@@ -44,15 +43,11 @@ document.addEventListener('DOMContentLoaded', function() {
     function setupUIForUser(userInfo) {
         isAdmin = userInfo.isAdmin;
         userPermissions = new Set(userInfo.permissions);
-
         userNameSpan.textContent = userInfo.name;
         userInfoDiv.style.display = 'flex';
-
         if (isAdmin) {
             adminTabBtn.style.display = 'block';
         }
-
-        // PERMISSION CHECK: Decide which BA Name input to show
         if (userPermissions.has('MULTI_SELECT') || userPermissions.has('SEARCH_ALL')) {
             baNameSelectContainer.style.display = 'block';
             baNameInput.style.display = 'none';
@@ -69,7 +64,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }).then(userInfo => {
         if (userInfo) {
             setupUIForUser(userInfo);
-            // Only populate the dropdown if the user has permissions for it
             if (userPermissions.has('MULTI_SELECT') || userPermissions.has('SEARCH_ALL')) {
                 populateBaNameDropdown();
             }
@@ -83,10 +77,8 @@ document.addEventListener('DOMContentLoaded', function() {
             names.forEach(name => {
                 const label = document.createElement('label');
                 const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.value = name;
+                checkbox.type = 'checkbox'; checkbox.value = name;
                 checkbox.addEventListener('change', updateBaNameButtonText);
-                
                 label.appendChild(checkbox);
                 label.appendChild(document.createTextNode(` ${name}`));
                 baNameCheckboxList.appendChild(label);
@@ -108,7 +100,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Multi-select BA Name logic
     if (baNameSelectButton) {
         baNameSelectButton.addEventListener('click', function(e) {
             baNameDropdown.classList.toggle('show');
@@ -129,7 +120,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // --- UI MANAGEMENT (DARK MODE, TABS, WEEK 5) ---
+    // --- UI MANAGEMENT ---
     function setDarkMode(isDark) {
         if (isDark) {
             document.body.classList.remove('light-mode');
@@ -150,10 +141,8 @@ document.addEventListener('DOMContentLoaded', function() {
     window.showTab = function(tabId, clickedButton) {
         document.querySelectorAll(".tab-content").forEach(tab => tab.classList.remove('active-content'));
         document.querySelectorAll(".tab-button").forEach(btn => btn.classList.remove("active"));
-        
         document.getElementById(tabId).classList.add('active-content');
         clickedButton.classList.add("active");
-
         if (tabId !== 'homeArea') {
             topLeftDynamicContent.appendChild(homeTitleContainer);
             topLeftDynamicContent.appendChild(homeSearchControlsContainer);
@@ -161,16 +150,11 @@ document.addEventListener('DOMContentLoaded', function() {
             homeContentCentered.appendChild(homeTitleContainer);
             homeContentCentered.appendChild(homeSearchControlsContainer);
         }
-
         if (tabId === 'adminArea' && isAdmin) {
             loadUserManagementPanel();
         }
-        
-        // *** FIX: Trigger loading payout cards when the Payout tab is clicked ***
         if (tabId === 'payoutArea' && isAdmin) {
             loadPayoutCards();
-        } else if (tabId !== 'payoutArea' && payoutInfoCards) {
-            payoutInfoCards.innerHTML = ''; // Clear cards when leaving the tab
         }
     };
 
@@ -182,9 +166,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 week5Option.style.display = 'block';
             } else {
                 week5Option.style.display = 'none';
-                if (weekSelect.value === 'Week 5') {
-                    weekSelect.value = '';
-                }
+                if (weekSelect.value === 'Week 5') { weekSelect.value = ''; }
             }
         }
     }
@@ -197,32 +179,24 @@ document.addEventListener('DOMContentLoaded', function() {
     function loadUserManagementPanel() {
         userManagementTableContainer.innerHTML = '<div class="loading-indicator">⏳ Loading users...</div>';
         adminStatusMessage.textContent = '';
-        fetch('/api/users')
-            .then(res => res.json())
-            .then(data => {
-                if (data.error) throw new Error(data.error);
-                buildUserTable(data.users, data.all_permissions);
-            })
-            .catch(error => {
-                userManagementTableContainer.innerHTML = `<p class="error-message-main">❌ ${error.message}</p>`;
-            });
+        fetch('/api/users').then(res => res.json()).then(data => {
+            if (data.error) throw new Error(data.error);
+            buildUserTable(data.users, data.all_permissions);
+        }).catch(error => {
+            userManagementTableContainer.innerHTML = `<p class="error-message-main">❌ ${error.message}</p>`;
+        });
     }
     function buildUserTable(users, allPermissions) {
         userManagementTableContainer.innerHTML = '';
-        const table = document.createElement('table');
-        table.id = 'userManagementTable';
+        const table = document.createElement('table'); table.id = 'userManagementTable';
         const thead = document.createElement('thead');
         let headerRowHtml = '<tr><th>Name</th><th>Email</th>';
-        allPermissions.forEach(perm => {
-            headerRowHtml += `<th>${perm.replace(/_/g, ' ')}</th>`;
-        });
+        allPermissions.forEach(perm => { headerRowHtml += `<th>${perm.replace(/_/g, ' ')}</th>`; });
         headerRowHtml += '<th>Action</th></tr>';
-        thead.innerHTML = headerRowHtml;
-        table.appendChild(thead);
+        thead.innerHTML = headerRowHtml; table.appendChild(thead);
         const tbody = document.createElement('tbody');
         users.forEach(user => {
-            const tr = document.createElement('tr');
-            tr.dataset.email = user.email;
+            const tr = document.createElement('tr'); tr.dataset.email = user.email;
             let rowHtml = `<td>${user.name}</td><td>${user.email}</td>`;
             const userPerms = new Set(user.permissions);
             allPermissions.forEach(perm => {
@@ -232,11 +206,9 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             const saveButtonDisabled = user.is_admin ? 'disabled' : '';
             rowHtml += `<td><button class="save-permissions-btn" ${saveButtonDisabled}>Save</button></td>`;
-            tr.innerHTML = rowHtml;
-            tbody.appendChild(tr);
+            tr.innerHTML = rowHtml; tbody.appendChild(tr);
         });
-        table.appendChild(tbody);
-        userManagementTableContainer.appendChild(table);
+        table.appendChild(tbody); userManagementTableContainer.appendChild(table);
         document.querySelectorAll('.save-permissions-btn').forEach(button => {
             button.addEventListener('click', handlePermissionSave);
         });
@@ -249,30 +221,21 @@ document.addEventListener('DOMContentLoaded', function() {
         row.querySelectorAll('input[type="checkbox"]:checked').forEach(checkbox => {
             selectedPermissions.push(checkbox.dataset.permission);
         });
-        button.textContent = 'Saving...';
-        button.disabled = true;
-        adminStatusMessage.textContent = '';
+        button.textContent = 'Saving...'; button.disabled = true; adminStatusMessage.textContent = '';
         fetch('/api/update_user_permission', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            method: 'POST', headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ email: email, permissions: selectedPermissions })
-        })
-        .then(res => res.json())
-        .then(data => {
+        }).then(res => res.json()).then(data => {
             if (data.success) {
                 adminStatusMessage.textContent = data.message;
                 adminStatusMessage.className = 'admin-status-message success';
             } else { throw new Error(data.error); }
-        })
-        .catch(error => {
+        }).catch(error => {
             adminStatusMessage.textContent = `Error: ${error.message}`;
             adminStatusMessage.className = 'admin-status-message error';
-        })
-        .finally(() => {
+        }).finally(() => {
             button.textContent = 'Save';
-            if (!row.querySelector('input[type=checkbox]').disabled) {
-                button.disabled = false;
-            }
+            if (!row.querySelector('input[type=checkbox]').disabled) { button.disabled = false; }
             setTimeout(() => { adminStatusMessage.textContent = ''; adminStatusMessage.className = 'admin-status-message'; }, 5000);
         });
     }
@@ -281,7 +244,6 @@ document.addEventListener('DOMContentLoaded', function() {
     function performSearch() {
         const month = monthSelect.value, week = weekSelect.value, palcode = palcodeInput.value.trim();
         let baNamesToSearch = [];
-        
         if (userPermissions.has('MULTI_SELECT') || userPermissions.has('SEARCH_ALL')) {
             const checkedBoxes = baNameCheckboxList.querySelectorAll('input[type="checkbox"]:checked');
             checkedBoxes.forEach(checkbox => baNamesToSearch.push(checkbox.value));
@@ -289,38 +251,24 @@ document.addEventListener('DOMContentLoaded', function() {
             const baNameValue = baNameInput.value.trim();
             if (baNameValue) baNamesToSearch.push(baNameValue);
         }
-        
         const errorTarget = document.getElementById('homeErrorMessage'); 
-        errorTarget.textContent = ''; 
-        let missingFields = [];
+        errorTarget.textContent = ''; let missingFields = [];
         if (!month) missingFields.push("MONTH");
         if (!week) missingFields.push("WEEK");
-        if (!userPermissions.has('SEARCH_ALL') && baNamesToSearch.length === 0) {
-             missingFields.push("BA NAME");
-        }
-        if (missingFields.length > 0) { 
-            errorTarget.textContent = `❌ Please select: ${missingFields.join(', ')}.`; 
-            return; 
-        }
-
-        searchButton.disabled = true; 
-        searchButton.textContent = 'SEARCHING...';
+        if (!userPermissions.has('SEARCH_ALL') && baNamesToSearch.length === 0) { missingFields.push("BA NAME"); }
+        if (missingFields.length > 0) { errorTarget.textContent = `❌ Please select: ${missingFields.join(', ')}.`; return; }
+        searchButton.disabled = true; searchButton.textContent = 'SEARCHING...';
         showTab('dashboardDisplayArea', dashboardTabBtn); 
-        dashboardPlaceholder.style.display = 'none'; 
-        dashboardDataDisplay.style.display = 'none';
-        dashboardSearchError.style.display = 'none'; 
-        loadingIndicator.style.display = 'flex';
+        dashboardPlaceholder.style.display = 'none'; dashboardDataDisplay.style.display = 'none';
+        dashboardSearchError.style.display = 'none'; loadingIndicator.style.display = 'flex';
         const searchPayload = { month: month, week: week, baNames: baNamesToSearch, palcode: palcode };
         fetch('/api/search', {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(searchPayload),
-        })
-        .then(res => {
+        }).then(res => {
             if (res.status === 401) { window.location.href = '/login'; return Promise.reject('Session expired'); }
             if (!res.ok) { return res.json().then(errData => { throw new Error(errData.error || `Server error: ${res.status}`); }); }
             return res.json();
-        })
-        .then(data => handleSearchSuccess(data))
-        .catch(error => handleSearchFailure(error));
+        }).then(data => handleSearchSuccess(data)).catch(error => handleSearchFailure(error));
     }
 
     function handleSearchSuccess(data) {
@@ -370,38 +318,23 @@ document.addEventListener('DOMContentLoaded', function() {
         const commissionCard = document.getElementById('commissionCard');
         const totalCommissionValue = document.getElementById('totalCommissionValue');
 
-        if (commissionCard) {
-            commissionCard.style.display = userPermissions.has('VIEW_COMMISSION') ? 'flex' : 'none';
-        }
-        
+        if (commissionCard) { commissionCard.style.display = userPermissions.has('VIEW_COMMISSION') ? 'flex' : 'none'; }
         if(baNameDisplay) {
-            baNameDisplay.innerHTML = ''; 
-            baNameDisplay.className = 'ba-name-display'; 
+            baNameDisplay.innerHTML = ''; baNameDisplay.className = 'ba-name-display'; 
             const selectedNames = data.searchCriteria?.baNames || [];
-            
             if (selectedNames.length > 1 && (userPermissions.has('MULTI_SELECT') || userPermissions.has('SEARCH_ALL'))) {
-                const namesContainer = document.createElement('div');
-                namesContainer.className = 'ba-name-scroll-content';
+                const namesContainer = document.createElement('div'); namesContainer.className = 'ba-name-scroll-content';
                 const appendNames = () => {
                     selectedNames.forEach((name) => {
-                        const nameSpan = document.createElement('span');
-                        nameSpan.className = 'ba-name-scroll-item';
-                        nameSpan.textContent = name;
-                        namesContainer.appendChild(nameSpan);
-                        const separatorSpan = document.createElement('span');
-                        separatorSpan.className = 'ba-name-scroll-separator';
-                        separatorSpan.textContent = '|';
-                        namesContainer.appendChild(separatorSpan);
+                        const nameSpan = document.createElement('span'); nameSpan.className = 'ba-name-scroll-item'; nameSpan.textContent = name; namesContainer.appendChild(nameSpan);
+                        const separatorSpan = document.createElement('span'); separatorSpan.className = 'ba-name-scroll-separator'; separatorSpan.textContent = '|'; namesContainer.appendChild(separatorSpan);
                     });
                 };
-                appendNames(); 
-                appendNames(); 
+                appendNames(); appendNames(); 
                 const animationDuration = selectedNames.length * 5;
                 namesContainer.style.animationDuration = `${animationDuration}s`;
                 baNameDisplay.appendChild(namesContainer);
-            } else {
-                baNameDisplay.textContent = data.baNameDisplay || "ALL BA's";
-            }
+            } else { baNameDisplay.textContent = data.baNameDisplay || "ALL BA's"; }
         }
 
         const summary = data.summary || {};
@@ -410,147 +343,90 @@ document.addEventListener('DOMContentLoaded', function() {
         if(totalSuspendedValue) animateValue(totalSuspendedValue, 0, summary.totalSuspended || 0, 700);
         if(totalSalaryValue) animateValue(totalSalaryValue, 0, summary.totalSalary || 0, 700, true);
         if(totalIncentiveValue) animateValue(totalIncentiveValue, 0, summary.totalIncentives || 0, 700, true);
-        
-        if (totalCommissionValue && userPermissions.has('VIEW_COMMISSION')) {
-            animateValue(totalCommissionValue, 0, summary.totalCommission || 0, 700);
-        }
-        
+        if (totalCommissionValue && userPermissions.has('VIEW_COMMISSION')) { animateValue(totalCommissionValue, 0, summary.totalCommission || 0, 700); }
         if(monthDisplay) monthDisplay.textContent = data.monthDisplay || "N/A";
         if(weekDisplay) weekDisplay.textContent = data.weekDisplay || "N/A";
         if(dateRangeDisplay) dateRangeDisplay.textContent = data.dateRangeDisplay || ""; 
-        if (statusValue) {
-            const summaryStatus = determineSummaryStatus(data.resultsTable);
-            statusValue.textContent = summaryStatus.text; statusValue.className = summaryStatus.class;
-        }
+        if (statusValue) { const summaryStatus = determineSummaryStatus(data.resultsTable); statusValue.textContent = summaryStatus.text; statusValue.className = summaryStatus.class; }
         if(lastUpdateValue) { lastUpdateValue.textContent = data.lastUpdate || "N/A"; }
-        
         if (baRankingListDiv) {
             baRankingListDiv.innerHTML = ''; 
             if (data.rankedBaList && data.rankedBaList.length > 0) {
                 data.rankedBaList.forEach((ba, index) => {
-                    const itemDiv = document.createElement('div');
-                    itemDiv.classList.add('ba-rank-item');
-                    const rankSpan = document.createElement('span');
-                    rankSpan.classList.add('rank-number');
-                    rankSpan.textContent = `${index + 1}.`;
-                    const nameSpan = document.createElement('span');
-                    nameSpan.classList.add('ba-name');
-                    nameSpan.textContent = ba.originalName || "N/A"; 
-                    nameSpan.title = ba.originalName || "N/A";
-                    const fdSpan = document.createElement('span');
-                    fdSpan.classList.add('ba-fd-count');
-                    fdSpan.textContent = (ba.totalFd || 0).toLocaleString();
+                    const itemDiv = document.createElement('div'); itemDiv.classList.add('ba-rank-item');
+                    const rankSpan = document.createElement('span'); rankSpan.classList.add('rank-number'); rankSpan.textContent = `${index + 1}.`;
+                    const nameSpan = document.createElement('span'); nameSpan.classList.add('ba-name'); nameSpan.textContent = ba.originalName || "N/A"; nameSpan.title = ba.originalName || "N/A";
+                    const fdSpan = document.createElement('span'); fdSpan.classList.add('ba-fd-count'); fdSpan.textContent = (ba.totalFd || 0).toLocaleString();
                     itemDiv.appendChild(rankSpan); itemDiv.appendChild(nameSpan); itemDiv.appendChild(fdSpan);
                     baRankingListDiv.appendChild(itemDiv);
                 });
-            } else {
-                baRankingListDiv.innerHTML = '<p style="text-align:center; font-size:0.8em; color:var(--text-color-subtle);">No BA ranking data available.</p>';
-            }
+            } else { baRankingListDiv.innerHTML = '<p style="text-align:center; font-size:0.8em; color:var(--text-color-subtle);">No BA ranking data available.</p>'; }
         }
         
         resultsTableContainer.innerHTML = '';
         if (userPermissions.has('EDIT_TABLE') && data.resultsTable && data.resultsTable.length > 0) {
             tableControls.style.display = 'flex';
-        } else {
-            tableControls.style.display = 'none';
-        }
-        
+        } else { tableControls.style.display = 'none'; }
         if (data.resultsTable && data.resultsTable.length > 0) {
             const table = document.createElement('table'), thead = document.createElement('thead'), tbody = document.createElement('tbody'), headerRow = document.createElement('tr');
             const headers = ['PALCODE','MONTH','WEEK','BA Name','REG','Valid FD','Suspended FD','Rate','GGR Per FD','Total GGR','SALARY','Status'];
             const editableColumns = ['MONTH', 'WEEK', 'BA Name', 'REG', 'Valid FD', 'Suspended FD', 'Total GGR'];
-
             const thNo = document.createElement('th'); thNo.textContent = 'No.'; headerRow.appendChild(thNo);
             headers.forEach(text => { const th = document.createElement('th'); th.textContent = text.toUpperCase(); headerRow.appendChild(th); });
             thead.appendChild(headerRow); table.appendChild(thead);
-
             data.resultsTable.forEach((rowData, rowIndex) => {
-                const tr = document.createElement('tr');
-                tr.dataset.palcode = rowData[0];
+                const tr = document.createElement('tr'); tr.dataset.palcode = rowData[0];
                 tr.classList.add('result-row-animate'); tr.style.animationDelay = `${rowIndex * 0.05}s`;
-                
                 const tdNo = document.createElement('td'); tdNo.textContent = rowIndex + 1; tr.appendChild(tdNo);
-
                 headers.forEach((header, cellIndex) => {
                     const td = document.createElement('td');
-                    const fieldName = header.toLowerCase().replace(/ /g, '_');
-                    td.dataset.field = fieldName;
+                    const fieldName = header.toLowerCase().replace(/ /g, '_'); td.dataset.field = fieldName;
                     const cellData = (rowData[cellIndex] === null || rowData[cellIndex] === undefined) ? '' : rowData[cellIndex];
-
                     if (userPermissions.has('EDIT_TABLE') && header === 'Status') {
                         const select = document.createElement('select');
                         statusOptions.forEach(option => {
                             const optionEl = document.createElement('option');
-                            optionEl.value = option;
-                            optionEl.textContent = option;
-                            if (option.toUpperCase() === cellData.toString().toUpperCase()) {
-                                optionEl.selected = true;
-                            }
+                            optionEl.value = option; optionEl.textContent = option;
+                            if (option.toUpperCase() === cellData.toString().toUpperCase()) { optionEl.selected = true; }
                             select.appendChild(optionEl);
                         });
                         td.appendChild(select);
                     } else {
                         td.textContent = cellData;
                         if (userPermissions.has('EDIT_TABLE') && editableColumns.includes(header)) {
-                            td.contentEditable = "true";
-                            td.classList.add('editable-cell');
+                            td.contentEditable = "true"; td.classList.add('editable-cell');
                         }
                     }
                     tr.appendChild(td);
                 });
                 tbody.appendChild(tr);
             });
-            table.appendChild(tbody);
-            resultsTableContainer.appendChild(table);
-        } else {
-             resultsTableContainer.innerHTML = `<p class="no-data-message">${data.message || 'Summary data is shown in the left panel. No detailed records for this query.'}</p>`;
-        }
+            table.appendChild(tbody); resultsTableContainer.appendChild(table);
+        } else { resultsTableContainer.innerHTML = `<p class="no-data-message">${data.message || 'Summary data is shown in the left panel. No detailed records for this query.'}</p>`; }
         if(dashboardDataDisplay) { dashboardDataDisplay.style.opacity = '0'; setTimeout(() => { dashboardDataDisplay.style.opacity = '1'; }, 50); }
     }
     
     if (saveButton) {
         saveButton.addEventListener('click', async () => {
-            saveButton.disabled = true;
-            saveStatusMessage.textContent = 'Saving...';
-            saveStatusMessage.className = 'saving';
+            saveButton.disabled = true; saveStatusMessage.textContent = 'Saving...'; saveStatusMessage.className = 'saving';
             const dataToSave = [];
-            const tableRows = document.querySelectorAll('#resultsTableContainer tbody tr');
-
-            tableRows.forEach(row => {
+            document.querySelectorAll('#resultsTableContainer tbody tr').forEach(row => {
                 const statusElement = row.querySelector('[data-field="status"]');
-                const rowData = {
-                    palcode: row.dataset.palcode,
-                    month: row.querySelector('[data-field="month"]').textContent,
-                    week: row.querySelector('[data-field="week"]').textContent,
-                    ba_name: row.querySelector('[data-field="ba_name"]').textContent,
-                    reg: row.querySelector('[data-field="reg"]').textContent,
-                    valid_fd: row.querySelector('[data-field="valid_fd"]').textContent,
-                    suspended_fd: row.querySelector('[data-field="suspended_fd"]').textContent,
-                    rate: row.querySelector('[data-field="rate"]').textContent,
-                    ggr_per_fd: row.querySelector('[data-field="ggr_per_fd"]').textContent,
-                    total_ggr: row.querySelector('[data-field="total_ggr"]').textContent,
-                    salary: row.querySelector('[data-field="salary"]').textContent,
-                    status: statusElement.querySelector('select') ? statusElement.querySelector('select').value : statusElement.textContent
-                };
-                dataToSave.push(rowData);
-            });
-            
-            try {
-                const response = await fetch('/api/save_dashboard', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(dataToSave)
+                dataToSave.push({
+                    palcode: row.dataset.palcode, month: row.querySelector('[data-field="month"]').textContent, week: row.querySelector('[data-field="week"]').textContent, ba_name: row.querySelector('[data-field="ba_name"]').textContent,
+                    reg: row.querySelector('[data-field="reg"]').textContent, valid_fd: row.querySelector('[data-field="valid_fd"]').textContent, suspended_fd: row.querySelector('[data-field="suspended_fd"]').textContent,
+                    rate: row.querySelector('[data-field="rate"]').textContent, ggr_per_fd: row.querySelector('[data-field="ggr_per_fd"]').textContent, total_ggr: row.querySelector('[data-field="total_ggr"]').textContent,
+                    salary: row.querySelector('[data-field="salary"]').textContent, status: statusElement.querySelector('select') ? statusElement.querySelector('select').value : statusElement.textContent
                 });
-                
+            });
+            try {
+                const response = await fetch('/api/save_dashboard', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(dataToSave) });
                 if (response.status === 401) { window.location.href = '/login'; return; }
-                
                 const result = await response.json();
                 if (result.success) {
                     saveStatusMessage.textContent = result.message || 'Save Successful!';
                     saveStatusMessage.className = 'success';
-                } else {
-                    throw new Error(result.error || 'Unknown error occurred.');
-                }
+                } else { throw new Error(result.error || 'Unknown error occurred.'); }
             } catch (error) {
                 saveStatusMessage.textContent = `Error: ${error.message}`;
                 saveStatusMessage.className = 'error';
@@ -562,38 +438,25 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Handle payout form submission
+    // --- Payout Section ---
     if (payoutForm) {
         payoutForm.addEventListener('submit', async function(e) {
             e.preventDefault();
-            payoutFormStatus.textContent = 'Submitting...';
-            const formData = new FormData(payoutForm);
+            payoutFormStatus.textContent = 'Submitting...'; const formData = new FormData(payoutForm);
             try {
-                const res = await fetch('/api/payout/submit', {
-                    method: 'POST',
-                    body: formData
-                });
+                const res = await fetch('/api/payout/submit', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.success) {
-                    payoutFormStatus.textContent = data.message;
-                    payoutForm.reset();
-                    // If the user is an admin, refresh the card list after submission
-                    if (isAdmin) {
-                        setTimeout(loadPayoutCards, 1000); 
-                    }
-                } else {
-                    payoutFormStatus.textContent = data.error || 'Submission failed.';
-                }
-            } catch (err) {
-                payoutFormStatus.textContent = 'Submission error.';
-            }
+                    payoutFormStatus.textContent = data.message; payoutForm.reset();
+                    if (isAdmin) { setTimeout(loadPayoutCards, 1000); }
+                } else { payoutFormStatus.textContent = data.error || 'Submission failed.'; }
+            } catch (err) { payoutFormStatus.textContent = 'Submission error.'; }
         });
     }
 
-    // Load payout cards for admin
     async function loadPayoutCards() {
         if (!isAdmin || !payoutInfoCards) return;
-        payoutInfoCards.innerHTML = 'Loading...';
+        payoutInfoCards.innerHTML = '<div class="loading-indicator">⏳ Loading submissions...</div>';
         try {
             const res = await fetch('/api/payout/list');
             const data = await res.json();
@@ -606,7 +469,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // *** FIX: Removed inline styles from the img tag and wrapped it in a link. ***
             payoutInfoCards.innerHTML = data.payouts.map(p => `
                 <div class="payout-card">
                     <div><strong>BA NAME:</strong> ${p.ba_name}</div>
@@ -617,6 +479,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <a href="/uploads/${p.qr_image}" target="_blank" title="View full size QR">
                         <img src="/uploads/${p.qr_image}" alt="QR Code">
                     </a>
+                    <button class="delete-payout-btn" data-payout-id="${p.submitted_at}">Delete</button>
                 </div>
             `).join('');
         } catch (err) {
@@ -624,16 +487,44 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Show cards only for admin when payout tab is active
-    if (payoutTabBtn) {
-        payoutTabBtn.addEventListener('click', () => {
-            if (isAdmin) {
-                loadPayoutCards();
-            } else if (payoutInfoCards) {
-                payoutInfoCards.innerHTML = '';
+    async function handlePayoutDelete(event) {
+        const button = event.target;
+        const payoutId = button.dataset.payoutId;
+
+        if (!confirm('Are you sure you want to delete this submission? This action cannot be undone.')) {
+            return;
+        }
+
+        button.textContent = 'Deleting...';
+        button.disabled = true;
+
+        try {
+            const response = await fetch('/api/payout/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: payoutId })
+            });
+            const result = await response.json();
+            if (result.success) {
+                const card = button.closest('.payout-card');
+                if (card) {
+                    card.remove();
+                }
+            } else {
+                throw new Error(result.error || 'Failed to delete submission.');
             }
-        });
+        } catch (error) {
+            alert('Error: ' + error.message);
+            button.textContent = 'Delete';
+            button.disabled = false;
+        }
     }
+    
+    payoutInfoCards.addEventListener('click', function(event) {
+        if (event.target.classList.contains('delete-payout-btn')) {
+            handlePayoutDelete(event);
+        }
+    });
 
     function animateValue(element, start, end, duration, isCurrency = false) {
         if (!element || typeof end !== 'number' || isNaN(end)) {
