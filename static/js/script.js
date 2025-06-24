@@ -440,17 +440,40 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Payout Section ---
     if (payoutForm) {
+        const fileInput = document.getElementById('qr_image_input');
+        const fileChosenSpan = document.getElementById('file-chosen');
+        
+        // *** NEW ***: Listener for the custom file input to display the filename
+        if (fileInput && fileChosenSpan) {
+            fileInput.addEventListener('change', function() {
+                if (this.files.length > 0) {
+                    fileChosenSpan.textContent = this.files[0].name;
+                } else {
+                    fileChosenSpan.textContent = 'No file chosen';
+                }
+            });
+        }
+    
         payoutForm.addEventListener('submit', async function(e) {
             e.preventDefault();
-            payoutFormStatus.textContent = 'Submitting...'; const formData = new FormData(payoutForm);
+            payoutFormStatus.textContent = 'Uploading...'; 
+            const formData = new FormData(payoutForm);
             try {
                 const res = await fetch('/api/payout/submit', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.success) {
-                    payoutFormStatus.textContent = data.message; payoutForm.reset();
-                    if (isAdmin) { setTimeout(loadPayoutCards, 1000); }
-                } else { payoutFormStatus.textContent = data.error || 'Submission failed.'; }
-            } catch (err) { payoutFormStatus.textContent = 'Submission error.'; }
+                    payoutFormStatus.textContent = data.message;
+                    payoutForm.reset();
+                    if (fileChosenSpan) fileChosenSpan.textContent = 'No file chosen'; // Reset filename display
+                    if (isAdmin) {
+                        setTimeout(loadPayoutCards, 1000);
+                    }
+                } else {
+                    payoutFormStatus.textContent = `Error: ${data.error || 'Submission failed.'}`;
+                }
+            } catch (err) {
+                payoutFormStatus.textContent = 'An unexpected error occurred.';
+            }
         });
     }
 
@@ -490,14 +513,11 @@ document.addEventListener('DOMContentLoaded', function() {
     async function handlePayoutDelete(event) {
         const button = event.target;
         const payoutId = button.dataset.payoutId;
-
         if (!confirm('Are you sure you want to delete this submission? This action cannot be undone.')) {
             return;
         }
-
         button.textContent = 'Deleting...';
         button.disabled = true;
-
         try {
             const response = await fetch('/api/payout/delete', {
                 method: 'POST',
