@@ -153,7 +153,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tabId === 'adminArea' && isAdmin) {
             loadUserManagementPanel();
         }
-        if (tabId === 'payoutArea' && isAdmin) {
+        // *** MODIFIED ***: Check for admin OR the 'VIEW_PAYOUTS' permission
+        if (tabId === 'payoutArea' && (isAdmin || userPermissions.has('VIEW_PAYOUTS'))) {
             loadPayoutCards();
         }
     };
@@ -443,7 +444,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const fileInput = document.getElementById('qr_image_input');
         const fileChosenSpan = document.getElementById('file-chosen');
         
-        // *** NEW ***: Listener for the custom file input to display the filename
         if (fileInput && fileChosenSpan) {
             fileInput.addEventListener('change', function() {
                 if (this.files.length > 0) {
@@ -464,8 +464,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.success) {
                     payoutFormStatus.textContent = data.message;
                     payoutForm.reset();
-                    if (fileChosenSpan) fileChosenSpan.textContent = 'No file chosen'; // Reset filename display
-                    if (isAdmin) {
+                    if (fileChosenSpan) fileChosenSpan.textContent = 'No file chosen';
+                    if (isAdmin || userPermissions.has('VIEW_PAYOUTS')) {
                         setTimeout(loadPayoutCards, 1000);
                     }
                 } else {
@@ -478,7 +478,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function loadPayoutCards() {
-        if (!isAdmin || !payoutInfoCards) return;
+        // *** MODIFIED ***: Check for admin OR the 'VIEW_PAYOUTS' permission
+        if (!payoutInfoCards || (!isAdmin && !userPermissions.has('VIEW_PAYOUTS'))) return;
+
         payoutInfoCards.innerHTML = '<div class="loading-indicator">⏳ Loading submissions...</div>';
         try {
             const res = await fetch('/api/payout/list');
@@ -502,7 +504,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     <a href="/uploads/${p.qr_image}" target="_blank" title="View full size QR">
                         <img src="/uploads/${p.qr_image}" alt="QR Code">
                     </a>
-                    <button class="delete-payout-btn" data-payout-id="${p.submitted_at}">Delete</button>
+                    ${/* *** MODIFIED ***: Only show delete button to admins */ ''}
+                    ${isAdmin ? `<button class="delete-payout-btn" data-payout-id="${p.submitted_at}">Delete</button>` : ''}
                 </div>
             `).join('');
         } catch (err) {
