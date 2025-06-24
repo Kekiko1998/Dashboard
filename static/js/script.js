@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchButton = document.getElementById('searchButton');
     const monthSelect = document.getElementById('monthSelect');
     const weekSelect = document.getElementById('weekSelect');
+    let baNameInput = document.getElementById('baNameInput'); 
     const palcodeInput = document.getElementById('palcodeInput');
     const homeErrorMessage = document.getElementById('homeErrorMessage');
     const dashboardTabBtn = document.getElementById('dashboardTabBtn');
@@ -23,19 +24,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const tableControls = document.getElementById('tableControls');
     const saveButton = document.getElementById('saveButton');
     const saveStatusMessage = document.getElementById('saveStatusMessage');
-    const payoutForm = document.getElementById('payoutForm');
-    const payoutFormStatus = document.getElementById('payoutFormStatus');
-    const payoutInfoCards = document.getElementById('payoutInfoCards');
-    const payoutListTitle = document.getElementById('payoutListTitle');
-    const payoutTabBtn = document.getElementById('payoutTabBtn');
-
-    // Single and Multi-Select BA Name Elements
-    const baNameInput = document.getElementById('baNameInput');
+    // New Dropdown Multi-Select Elements
     const baNameSelectContainer = document.getElementById('baNameSelectContainer');
     const baNameSelectButton = document.getElementById('baNameSelectButton');
     const baNameDropdown = document.getElementById('baNameDropdown');
     const baNameSearchInput = document.getElementById('baNameSearchInput');
     const baNameCheckboxList = document.getElementById('baNameCheckboxList');
+    const payoutForm = document.getElementById('payoutForm');
+    const payoutFormStatus = document.getElementById('payoutFormStatus');
+    const payoutInfoCards = document.getElementById('payoutInfoCards');
+    const payoutTabBtn = document.getElementById('payoutTabBtn');
 
     // --- State Variables ---
     let isAdmin = false;
@@ -52,7 +50,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (isAdmin) {
             adminTabBtn.style.display = 'block';
-            if(payoutListTitle) payoutListTitle.style.display = 'block';
         }
 
         // PERMISSION CHECK: Decide which BA Name input to show
@@ -78,7 +75,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     }).catch(error => console.error("Initialization failed:", error));
-
+    
     // --- Custom Multi-Select Dropdown Logic ---
     function populateBaNameDropdown() {
         fetch('/api/ba-names').then(res => res.json()).then(names => {
@@ -89,7 +86,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 checkbox.type = 'checkbox';
                 checkbox.value = name;
                 checkbox.addEventListener('change', updateBaNameButtonText);
-
+                
                 label.appendChild(checkbox);
                 label.appendChild(document.createTextNode(` ${name}`));
                 baNameCheckboxList.appendChild(label);
@@ -111,10 +108,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Multi-select BA Name logic
     if (baNameSelectButton) {
         baNameSelectButton.addEventListener('click', function(e) {
             baNameDropdown.classList.toggle('show');
-            baNameSearchInput.focus();
             e.stopPropagation();
         });
     }
@@ -127,7 +124,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     window.addEventListener('click', function(e) {
-        if (baNameDropdown && baNameDropdown.classList.contains('show') && !baNameSelectContainer.contains(e.target)) {
+        if (baNameDropdown && !baNameDropdown.contains(e.target) && !baNameSelectButton.contains(e.target)) {
             baNameDropdown.classList.remove('show');
         }
     });
@@ -153,7 +150,7 @@ document.addEventListener('DOMContentLoaded', function() {
     window.showTab = function(tabId, clickedButton) {
         document.querySelectorAll(".tab-content").forEach(tab => tab.classList.remove('active-content'));
         document.querySelectorAll(".tab-button").forEach(btn => btn.classList.remove("active"));
-
+        
         document.getElementById(tabId).classList.add('active-content');
         clickedButton.classList.add("active");
 
@@ -168,10 +165,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tabId === 'adminArea' && isAdmin) {
             loadUserManagementPanel();
         }
+        
+        // *** FIX: Trigger loading payout cards when the Payout tab is clicked ***
         if (tabId === 'payoutArea' && isAdmin) {
             loadPayoutCards();
-        } else if (tabId === 'payoutArea' && !isAdmin){
-            if (payoutInfoCards) payoutInfoCards.innerHTML = '';
+        } else if (tabId !== 'payoutArea' && payoutInfoCards) {
+            payoutInfoCards.innerHTML = ''; // Clear cards when leaving the tab
         }
     };
 
@@ -179,9 +178,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const selectedMonth = monthSelect.value;
         const week5Option = document.getElementById('week5Option');
         if (week5Option) {
-            // Months with potential for a 5th week based on typical calendar layouts
-            const monthsWith5Weeks = ['january', 'march', 'may', 'june', 'july', 'august', 'october', 'december'];
-            if (monthsWith5Weeks.includes(selectedMonth.toLowerCase())) {
+            if (selectedMonth.toLowerCase() === 'june') {
                 week5Option.style.display = 'block';
             } else {
                 week5Option.style.display = 'none';
@@ -195,7 +192,7 @@ document.addEventListener('DOMContentLoaded', function() {
     handleMonthChange();
 
     if (searchButton) { searchButton.addEventListener('click', performSearch); }
-
+    
     // --- Admin Panel Functions ---
     function loadUserManagementPanel() {
         userManagementTableContainer.innerHTML = '<div class="loading-indicator">⏳ Loading users...</div>';
@@ -210,7 +207,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 userManagementTableContainer.innerHTML = `<p class="error-message-main">❌ ${error.message}</p>`;
             });
     }
-
     function buildUserTable(users, allPermissions) {
         userManagementTableContainer.innerHTML = '';
         const table = document.createElement('table');
@@ -229,13 +225,12 @@ document.addEventListener('DOMContentLoaded', function() {
             tr.dataset.email = user.email;
             let rowHtml = `<td>${user.name}</td><td>${user.email}</td>`;
             const userPerms = new Set(user.permissions);
-            const isRootAdmin = user.is_admin;
             allPermissions.forEach(perm => {
-                const isChecked = isRootAdmin || userPerms.has(perm) ? 'checked' : '';
-                const isDisabled = isRootAdmin ? 'disabled' : '';
+                const isChecked = userPerms.has(perm) ? 'checked' : '';
+                const isDisabled = user.is_admin ? 'disabled' : '';
                 rowHtml += `<td><label class="switch"><input type="checkbox" data-permission="${perm}" ${isChecked} ${isDisabled}><span class="slider round"></span></label></td>`;
             });
-            const saveButtonDisabled = isRootAdmin ? 'disabled title="Root admin permissions cannot be changed."' : '';
+            const saveButtonDisabled = user.is_admin ? 'disabled' : '';
             rowHtml += `<td><button class="save-permissions-btn" ${saveButtonDisabled}>Save</button></td>`;
             tr.innerHTML = rowHtml;
             tbody.appendChild(tr);
@@ -246,7 +241,6 @@ document.addEventListener('DOMContentLoaded', function() {
             button.addEventListener('click', handlePermissionSave);
         });
     }
-
     function handlePermissionSave(event) {
         const button = event.target;
         const row = button.closest('tr');
@@ -287,7 +281,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function performSearch() {
         const month = monthSelect.value, week = weekSelect.value, palcode = palcodeInput.value.trim();
         let baNamesToSearch = [];
-
+        
         if (userPermissions.has('MULTI_SELECT') || userPermissions.has('SEARCH_ALL')) {
             const checkedBoxes = baNameCheckboxList.querySelectorAll('input[type="checkbox"]:checked');
             checkedBoxes.forEach(checkbox => baNamesToSearch.push(checkbox.value));
@@ -295,41 +289,35 @@ document.addEventListener('DOMContentLoaded', function() {
             const baNameValue = baNameInput.value.trim();
             if (baNameValue) baNamesToSearch.push(baNameValue);
         }
-
-        const errorTarget = document.getElementById('homeErrorMessage');
-        errorTarget.textContent = '';
+        
+        const errorTarget = document.getElementById('homeErrorMessage'); 
+        errorTarget.textContent = ''; 
         let missingFields = [];
         if (!month) missingFields.push("MONTH");
         if (!week) missingFields.push("WEEK");
         if (!userPermissions.has('SEARCH_ALL') && baNamesToSearch.length === 0) {
              missingFields.push("BA NAME");
         }
-        if (missingFields.length > 0) {
-            errorTarget.textContent = `❌ Please select: ${missingFields.join(', ')}.`;
-            return;
+        if (missingFields.length > 0) { 
+            errorTarget.textContent = `❌ Please select: ${missingFields.join(', ')}.`; 
+            return; 
         }
 
-        searchButton.disabled = true;
+        searchButton.disabled = true; 
         searchButton.textContent = 'SEARCHING...';
-        showTab('dashboardDisplayArea', dashboardTabBtn);
-        dashboardPlaceholder.style.display = 'none';
+        showTab('dashboardDisplayArea', dashboardTabBtn); 
+        dashboardPlaceholder.style.display = 'none'; 
         dashboardDataDisplay.style.display = 'none';
-        dashboardSearchError.style.display = 'none';
+        dashboardSearchError.style.display = 'none'; 
         loadingIndicator.style.display = 'flex';
         const searchPayload = { month: month, week: week, baNames: baNamesToSearch, palcode: palcode };
-
-        // *** FIX: Improved fetch call with robust error handling ***
         fetch('/api/search', {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(searchPayload),
         })
-        .then(async (res) => {
-            if (res.status === 401) { window.location.href = '/login'; throw new Error('Session expired'); }
-            const data = await res.json();
-            if (!res.ok) {
-                 // Throw an error with the message from the server's JSON response
-                throw new Error(data.error || `Server error: ${res.status}`);
-            }
-            return data;
+        .then(res => {
+            if (res.status === 401) { window.location.href = '/login'; return Promise.reject('Session expired'); }
+            if (!res.ok) { return res.json().then(errData => { throw new Error(errData.error || `Server error: ${res.status}`); }); }
+            return res.json();
         })
         .then(data => handleSearchSuccess(data))
         .catch(error => handleSearchFailure(error));
@@ -337,22 +325,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function handleSearchSuccess(data) {
         searchButton.disabled = false; searchButton.textContent = 'SEARCH'; loadingIndicator.style.display = 'none';
-
-        const hasData = (data.resultsTable && data.resultsTable.length > 0) || (data.summary && (data.summary.totalValidFd > 0 || data.summary.totalRegistration > 0));
+        if (data.error || (!data.resultsTable && !data.summary)) {
+            dashboardSearchError.querySelector('p').textContent = `⚠️ ${data.error || 'An unknown error occurred.'}`;
+            dashboardSearchError.style.display = 'flex'; dashboardDataDisplay.style.display = 'none';
+            return;
+        }
+        const hasData = (data.resultsTable && data.resultsTable.length > 0) || (data.summary && data.summary.totalValidFd > 0);
         if (hasData) {
-            dashboardSearchError.style.display = 'none';
-            populateDashboardWithData(data);
-            dashboardDataDisplay.style.display = 'flex';
+            dashboardSearchError.style.display = 'none'; populateDashboardWithData(data); dashboardDataDisplay.style.display = 'flex';
         } else {
             dashboardSearchError.querySelector('p').textContent = `⚠️ ${data.message || 'No data found for this query.'}`;
-            dashboardSearchError.style.display = 'flex';
-            dashboardDataDisplay.style.display = 'none';
+            dashboardSearchError.style.display = 'flex'; dashboardDataDisplay.style.display = 'none';
         }
     }
     function handleSearchFailure(error) {
         if (error.message.includes('Session expired')) { console.log("Session expired, redirecting..."); return; }
         searchButton.disabled = false; searchButton.textContent = 'SEARCH'; loadingIndicator.style.display = 'none';
-        dashboardSearchError.querySelector('p').textContent = `❌ Error: ${error.message || 'Unknown error.'}`;
+        dashboardSearchError.querySelector('p').textContent = `❌ Script Error: ${error.message || 'Unknown error.'}`;
         dashboardSearchError.style.display = 'flex'; dashboardDataDisplay.style.display = 'none';
         console.error("Server Call Error:", error);
     }
@@ -375,7 +364,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         return { text: 'MIXED', class: '' };
     }
-
+    
     function populateDashboardWithData(data) {
         const baNameDisplay = document.getElementById('baNameDisplay'), totalRegistrationValue = document.getElementById('totalRegistrationValue'), totalValidFdValue = document.getElementById('totalValidFdValue'), totalSuspendedValue = document.getElementById('totalSuspendedValue'), totalSalaryValue = document.getElementById('totalSalaryValue'), totalIncentiveValue = document.getElementById('totalIncentiveValue'), monthDisplay = document.getElementById('monthDisplay'), weekDisplay = document.getElementById('weekDisplay'), dateRangeDisplay = document.getElementById('dateRangeDisplay'), statusValue = document.getElementById('statusValue'), lastUpdateValue = document.getElementById('lastUpdateValue'), baRankingListDiv = document.getElementById('baRankingList'), resultsTableContainer = document.getElementById('resultsTableContainer');
         const commissionCard = document.getElementById('commissionCard');
@@ -384,43 +373,59 @@ document.addEventListener('DOMContentLoaded', function() {
         if (commissionCard) {
             commissionCard.style.display = userPermissions.has('VIEW_COMMISSION') ? 'flex' : 'none';
         }
-
+        
         if(baNameDisplay) {
-            baNameDisplay.innerHTML = '';
-            baNameDisplay.className = 'ba-name-display';
+            baNameDisplay.innerHTML = ''; 
+            baNameDisplay.className = 'ba-name-display'; 
             const selectedNames = data.searchCriteria?.baNames || [];
-
+            
             if (selectedNames.length > 1 && (userPermissions.has('MULTI_SELECT') || userPermissions.has('SEARCH_ALL'))) {
-                baNameDisplay.textContent = `MULTIPLE (${selectedNames.length})`;
-                baNameDisplay.title = selectedNames.join(', ');
+                const namesContainer = document.createElement('div');
+                namesContainer.className = 'ba-name-scroll-content';
+                const appendNames = () => {
+                    selectedNames.forEach((name) => {
+                        const nameSpan = document.createElement('span');
+                        nameSpan.className = 'ba-name-scroll-item';
+                        nameSpan.textContent = name;
+                        namesContainer.appendChild(nameSpan);
+                        const separatorSpan = document.createElement('span');
+                        separatorSpan.className = 'ba-name-scroll-separator';
+                        separatorSpan.textContent = '|';
+                        namesContainer.appendChild(separatorSpan);
+                    });
+                };
+                appendNames(); 
+                appendNames(); 
+                const animationDuration = selectedNames.length * 5;
+                namesContainer.style.animationDuration = `${animationDuration}s`;
+                baNameDisplay.appendChild(namesContainer);
             } else {
                 baNameDisplay.textContent = data.baNameDisplay || "ALL BA's";
-                baNameDisplay.title = data.baNameDisplay || "ALL BA's";
             }
         }
 
         const summary = data.summary || {};
-        animateValue(totalRegistrationValue, 0, summary.totalRegistration || 0, 700);
-        animateValue(totalValidFdValue, 0, summary.totalValidFd || 0, 700);
-        animateValue(totalSuspendedValue, 0, summary.totalSuspended || 0, 700);
-        animateValue(totalSalaryValue, 0, summary.totalSalary || 0, 700, true);
-        animateValue(totalIncentiveValue, 0, summary.totalIncentives || 0, 700, true);
-
+        if(totalRegistrationValue) animateValue(totalRegistrationValue, 0, summary.totalRegistration || 0, 700);
+        if(totalValidFdValue) animateValue(totalValidFdValue, 0, summary.totalValidFd || 0, 700);
+        if(totalSuspendedValue) animateValue(totalSuspendedValue, 0, summary.totalSuspended || 0, 700);
+        if(totalSalaryValue) animateValue(totalSalaryValue, 0, summary.totalSalary || 0, 700, true);
+        if(totalIncentiveValue) animateValue(totalIncentiveValue, 0, summary.totalIncentives || 0, 700, true);
+        
         if (totalCommissionValue && userPermissions.has('VIEW_COMMISSION')) {
-            animateValue(totalCommissionValue, 0, summary.totalCommission || 0, 700, true);
+            animateValue(totalCommissionValue, 0, summary.totalCommission || 0, 700);
         }
-
-        monthDisplay.textContent = data.monthDisplay || "N/A";
-        weekDisplay.textContent = data.weekDisplay || "N/A";
-        dateRangeDisplay.textContent = data.dateRangeDisplay || "";
+        
+        if(monthDisplay) monthDisplay.textContent = data.monthDisplay || "N/A";
+        if(weekDisplay) weekDisplay.textContent = data.weekDisplay || "N/A";
+        if(dateRangeDisplay) dateRangeDisplay.textContent = data.dateRangeDisplay || ""; 
         if (statusValue) {
             const summaryStatus = determineSummaryStatus(data.resultsTable);
             statusValue.textContent = summaryStatus.text; statusValue.className = summaryStatus.class;
         }
-        lastUpdateValue.textContent = data.lastUpdate || "N/A";
-
+        if(lastUpdateValue) { lastUpdateValue.textContent = data.lastUpdate || "N/A"; }
+        
         if (baRankingListDiv) {
-            baRankingListDiv.innerHTML = '';
+            baRankingListDiv.innerHTML = ''; 
             if (data.rankedBaList && data.rankedBaList.length > 0) {
                 data.rankedBaList.forEach((ba, index) => {
                     const itemDiv = document.createElement('div');
@@ -430,7 +435,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     rankSpan.textContent = `${index + 1}.`;
                     const nameSpan = document.createElement('span');
                     nameSpan.classList.add('ba-name');
-                    nameSpan.textContent = ba.originalName || "N/A";
+                    nameSpan.textContent = ba.originalName || "N/A"; 
                     nameSpan.title = ba.originalName || "N/A";
                     const fdSpan = document.createElement('span');
                     fdSpan.classList.add('ba-fd-count');
@@ -442,18 +447,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 baRankingListDiv.innerHTML = '<p style="text-align:center; font-size:0.8em; color:var(--text-color-subtle);">No BA ranking data available.</p>';
             }
         }
-
+        
         resultsTableContainer.innerHTML = '';
         if (userPermissions.has('EDIT_TABLE') && data.resultsTable && data.resultsTable.length > 0) {
             tableControls.style.display = 'flex';
         } else {
             tableControls.style.display = 'none';
         }
-
+        
         if (data.resultsTable && data.resultsTable.length > 0) {
             const table = document.createElement('table'), thead = document.createElement('thead'), tbody = document.createElement('tbody'), headerRow = document.createElement('tr');
             const headers = ['PALCODE','MONTH','WEEK','BA Name','REG','Valid FD','Suspended FD','Rate','GGR Per FD','Total GGR','SALARY','Status'];
-            const editableHeaders = ['MONTH', 'WEEK', 'BA Name', 'REG', 'Valid FD', 'Suspended FD', 'Total GGR'];
+            const editableColumns = ['MONTH', 'WEEK', 'BA Name', 'REG', 'Valid FD', 'Suspended FD', 'Total GGR'];
 
             const thNo = document.createElement('th'); thNo.textContent = 'No.'; headerRow.appendChild(thNo);
             headers.forEach(text => { const th = document.createElement('th'); th.textContent = text.toUpperCase(); headerRow.appendChild(th); });
@@ -463,7 +468,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const tr = document.createElement('tr');
                 tr.dataset.palcode = rowData[0];
                 tr.classList.add('result-row-animate'); tr.style.animationDelay = `${rowIndex * 0.05}s`;
-
+                
                 const tdNo = document.createElement('td'); tdNo.textContent = rowIndex + 1; tr.appendChild(tdNo);
 
                 headers.forEach((header, cellIndex) => {
@@ -486,7 +491,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         td.appendChild(select);
                     } else {
                         td.textContent = cellData;
-                        if (userPermissions.has('EDIT_TABLE') && editableHeaders.includes(header)) {
+                        if (userPermissions.has('EDIT_TABLE') && editableColumns.includes(header)) {
                             td.contentEditable = "true";
                             td.classList.add('editable-cell');
                         }
@@ -502,7 +507,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if(dashboardDataDisplay) { dashboardDataDisplay.style.opacity = '0'; setTimeout(() => { dashboardDataDisplay.style.opacity = '1'; }, 50); }
     }
-
+    
     if (saveButton) {
         saveButton.addEventListener('click', async () => {
             saveButton.disabled = true;
@@ -521,21 +526,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     reg: row.querySelector('[data-field="reg"]').textContent,
                     valid_fd: row.querySelector('[data-field="valid_fd"]').textContent,
                     suspended_fd: row.querySelector('[data-field="suspended_fd"]').textContent,
+                    rate: row.querySelector('[data-field="rate"]').textContent,
+                    ggr_per_fd: row.querySelector('[data-field="ggr_per_fd"]').textContent,
                     total_ggr: row.querySelector('[data-field="total_ggr"]').textContent,
+                    salary: row.querySelector('[data-field="salary"]').textContent,
                     status: statusElement.querySelector('select') ? statusElement.querySelector('select').value : statusElement.textContent
                 };
                 dataToSave.push(rowData);
             });
-
+            
             try {
                 const response = await fetch('/api/save_dashboard', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(dataToSave)
                 });
-
+                
                 if (response.status === 401) { window.location.href = '/login'; return; }
-
+                
                 const result = await response.json();
                 if (result.success) {
                     saveStatusMessage.textContent = result.message || 'Save Successful!';
@@ -558,8 +566,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (payoutForm) {
         payoutForm.addEventListener('submit', async function(e) {
             e.preventDefault();
-            const submitButton = payoutForm.querySelector('button[type="submit"]');
-            submitButton.disabled = true;
             payoutFormStatus.textContent = 'Submitting...';
             const formData = new FormData(payoutForm);
             try {
@@ -570,18 +576,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 const data = await res.json();
                 if (data.success) {
                     payoutFormStatus.textContent = data.message;
-                    payoutFormStatus.style.color = 'var(--primary-blue)';
                     payoutForm.reset();
-                    if (isAdmin) { setTimeout(loadPayoutCards, 1000); } // Refresh list for admin
+                    // If the user is an admin, refresh the card list after submission
+                    if (isAdmin) {
+                        setTimeout(loadPayoutCards, 1000); 
+                    }
                 } else {
-                    throw new Error(data.error || 'Submission failed.');
+                    payoutFormStatus.textContent = data.error || 'Submission failed.';
                 }
             } catch (err) {
-                payoutFormStatus.textContent = err.message;
-                payoutFormStatus.style.color = 'var(--error-color)';
-            } finally {
-                 submitButton.disabled = false;
-                 setTimeout(() => { payoutFormStatus.textContent = ''; }, 7000);
+                payoutFormStatus.textContent = 'Submission error.';
             }
         });
     }
@@ -589,7 +593,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Load payout cards for admin
     async function loadPayoutCards() {
         if (!isAdmin || !payoutInfoCards) return;
-        payoutInfoCards.innerHTML = '<div class="loading-indicator" style="min-height: 100px;">⏳ Loading submissions...</div>';
+        payoutInfoCards.innerHTML = 'Loading...';
         try {
             const res = await fetch('/api/payout/list');
             const data = await res.json();
@@ -598,23 +602,37 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             if (!data.payouts || data.payouts.length === 0) {
-                payoutInfoCards.innerHTML = '<div style="text-align:center; color: var(--text-color-subtle); padding: 20px;">No payout submissions yet.</div>';
+                payoutInfoCards.innerHTML = '<div class="no-payouts-message">No payout submissions yet.</div>';
                 return;
             }
-            // Display newest first
-            payoutInfoCards.innerHTML = data.payouts.reverse().map(p => `
+            
+            // *** FIX: Removed inline styles from the img tag and wrapped it in a link. ***
+            payoutInfoCards.innerHTML = data.payouts.map(p => `
                 <div class="payout-card">
                     <div><strong>BA NAME:</strong> ${p.ba_name}</div>
                     <div><strong>MOP ACCOUNT NAME:</strong> ${p.mop_account_name}</div>
                     <div><strong>MOP NUMBER:</strong> ${p.mop_number}</div>
                     <div><strong>Submitted by:</strong> ${p.user_email}</div>
                     <div><strong>Date:</strong> ${new Date(p.submitted_at).toLocaleString()}</div>
-                    <div class="payout-qr-container"><a href="/uploads/${p.qr_image}" target="_blank" title="Click to view full size"><img src="/uploads/${p.qr_image}" alt="QR Code"></a></div>
+                    <a href="/uploads/${p.qr_image}" target="_blank" title="View full size QR">
+                        <img src="/uploads/${p.qr_image}" alt="QR Code">
+                    </a>
                 </div>
             `).join('');
         } catch (err) {
-            payoutInfoCards.innerHTML = '<div class="error-message-main">Failed to load submissions.</div>';
+            payoutInfoCards.innerHTML = '<div class="error-message-main">Failed to load payout submissions.</div>';
         }
+    }
+
+    // Show cards only for admin when payout tab is active
+    if (payoutTabBtn) {
+        payoutTabBtn.addEventListener('click', () => {
+            if (isAdmin) {
+                loadPayoutCards();
+            } else if (payoutInfoCards) {
+                payoutInfoCards.innerHTML = '';
+            }
+        });
     }
 
     function animateValue(element, start, end, duration, isCurrency = false) {
@@ -630,9 +648,8 @@ document.addEventListener('DOMContentLoaded', function() {
             let currentValue = Math.floor(progress * (end - start) + start);
             let displayValue;
             if (isCurrency) {
-                let formattedEnd = parseFloat(end).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
                 displayValue = `₱ ${currentValue.toLocaleString()}`;
-                if (progress >= 1) { displayValue = `₱ ${formattedEnd}`; }
+                if (progress >= 1) { displayValue = `₱ ${parseFloat(end).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`; }
             } else {
                 displayValue = currentValue.toLocaleString();
                 if (progress >= 1) { displayValue = end.toLocaleString(); }
