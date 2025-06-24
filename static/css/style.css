@@ -429,3 +429,29 @@ input:checked + .slider:before {
 .slider.round:before {
   border-radius: 50%;
 }
+.payout-form-container {
+    max-width: 400px;
+    margin: 0 auto;
+    background: var(--panel-bg);
+    padding: 20px;
+    border-radius: 6px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+.payout-form-container label { display:block; margin-bottom:10px; font-family:var(--roboto-font);}
+.payout-form-container input[type="text"], .payout-form-container input[type="file"] {
+    width: 100%; margin-top: 3px; margin-bottom: 10px; padding: 7px; border-radius: 3px; border: 1px solid var(--input-border-color);
+}
+.payout-form-container button { padding: 8px 18px; border-radius: 3px; background: var(--primary-blue); color: #fff; border: none; font-family: var(--bebas-font); font-size: 1.1em; cursor: pointer;}
+.payout-form-container button:hover { background: var(--primary-blue-darker);}
+#payoutFormStatus { margin-left: 10px; font-size: 0.95em; color: var(--primary-blue);}
+.payout-card {
+    background: var(--panel-bg);
+    border: 1px solid var(--table-border-color);
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 15px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    font-family: var(--roboto-font);
+    max-width: 420px;
+}
+.payout-card img { margin-top: 8px; border-radius: 4px; }

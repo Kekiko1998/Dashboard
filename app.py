@@ -1,7 +1,7 @@
 import os
 import json
 from datetime import datetime, timedelta
-from flask import Flask, jsonify, render_template, request, redirect, url_for, session
+from flask import Flask, jsonify, render_template, request, redirect, url_for, session, send_from_directory
 from flask_login import LoginManager, current_user, login_required, login_user, logout_user, UserMixin
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -9,6 +9,8 @@ from google_auth_oauthlib.flow import Flow
 import logging
 import requests
 import pytz
+import uuid
+from werkzeug.utils import secure_filename
 
 # --- Basic Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -29,10 +31,12 @@ ALL_PERMISSIONS = {
     'VIEW_COMMISSION'
 }
 YOUR_TIMEZONE = 'Asia/Manila'
+PAYOUT_UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'payout_uploads')
 
 # --- Flask App Initialization ---
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
+os.makedirs(PAYOUT_UPLOAD_FOLDER, exist_ok=True)
 
 # --- Updated User and Login Management ---
 login_manager = LoginManager()
@@ -387,6 +391,62 @@ def save_dashboard():
     except Exception as e:
         logging.error(f"Error saving dashboard data: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/payout/submit', methods=['POST'])
+@login_required
+def submit_payout():
+    ba_name = request.form.get('ba_name', '').strip()
+    mop_account_name = request.form.get('mop_account_name', '').strip()
+    mop_number = request.form.get('mop_number', '').strip()
+    qr_file = request.files.get('qr_image')
+
+    if not all([ba_name, mop_account_name, mop_number, qr_file]):
+        return jsonify({'success': False, 'error': 'All fields are required.'}), 400
+
+    filename = f"{uuid.uuid4().hex}_{secure_filename(qr_file.filename)}"
+    file_path = os.path.join(PAYOUT_UPLOAD_FOLDER, filename)
+    qr_file.save(file_path)
+
+    # Save payout info to a local JSON file (or database)
+    payout_info_path = os.path.join(PAYOUT_UPLOAD_FOLDER, 'payout_submissions.json')
+    try:
+        if os.path.exists(payout_info_path):
+            with open(payout_info_path, 'r', encoding='utf-8') as f:
+                submissions = json.load(f)
+        else:
+            submissions = []
+        submissions.append({
+            'user_email': current_user.email,
+            'ba_name': ba_name,
+            'mop_account_name': mop_account_name,
+            'mop_number': mop_number,
+            'qr_image': filename,
+            'submitted_at': datetime.now().isoformat()
+        })
+        with open(payout_info_path, 'w', encoding='utf-8') as f:
+            json.dump(submissions, f, indent=2)
+    except Exception as e:
+        logging.error(f"Error saving payout info: {e}")
+        return jsonify({'success': False, 'error': 'Failed to save payout info.'}), 500
+
+    return jsonify({'success': True, 'message': 'Payout info submitted successfully.'})
+
+@app.route('/api/payout/list', methods=['GET'])
+@login_required
+def list_payouts():
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'error': 'Forbidden'}), 403
+    payout_info_path = os.path.join(PAYOUT_UPLOAD_FOLDER, 'payout_submissions.json')
+    if not os.path.exists(payout_info_path):
+        return jsonify({'success': True, 'payouts': []})
+    with open(payout_info_path, 'r', encoding='utf-8') as f:
+        submissions = json.load(f)
+    return jsonify({'success': True, 'payouts': submissions})
+
+@app.route('/uploads/<filename>')
+@login_required
+def uploaded_file(filename):
+    return send_from_directory(PAYOUT_UPLOAD_FOLDER, filename)
 
 # Logging Function
 SHEET_ID_CACHE = {}

@@ -54,7 +54,7 @@
                             <option value="Week 4">Week 4</option>
                             <option id="week5Option" value="Week 5">Week 5</option>
                         </select>
-                        <input type="text" id="baNameInput" placeholder="ENTER BA NAME" autocomplete="off" list="baNameSuggestions">
+                        <input type="text" id="baNameInput" placeholder="ENTER BA NAME" autocomplete="on" list="baNameSuggestions">
                         <datalist id="baNameSuggestions"></datalist>
                         <input type="text" id="palcodeInput" placeholder="ENTER PALCODE (OPTIONAL)">
                         <button id="searchButton" class="search-button">SEARCH</button>
@@ -153,6 +153,22 @@
             </div>
         </div>
         <!-- ========================================================== -->
+
+        <!-- PAYOUT FORM TAB CONTENT -->
+        <div id="payoutArea" class="tab-content">
+          <div class="payout-form-container">
+            <h2>Payout Submission</h2>
+            <form id="payoutForm" enctype="multipart/form-data">
+              <label>BA NAME:<br><input type="text" name="ba_name" required></label><br>
+              <label>MOP ACCOUNT NAME:<br><input type="text" name="mop_account_name" required></label><br>
+              <label>MOP NUMBER:<br><input type="text" name="mop_number" required></label><br>
+              <label>Upload QR Image:<br><input type="file" name="qr_image" accept="image/*" required></label><br>
+              <button type="submit">Submit</button>
+              <span id="payoutFormStatus"></span>
+            </form>
+          </div>
+          <div id="payoutInfoCards" style="margin-top:2em;"></div>
+        </div>
 
     </div>
   </div>

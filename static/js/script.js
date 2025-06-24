@@ -30,6 +30,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const baNameDropdown = document.getElementById('baNameDropdown');
     const baNameSearchInput = document.getElementById('baNameSearchInput');
     const baNameCheckboxList = document.getElementById('baNameCheckboxList');
+    const payoutForm = document.getElementById('payoutForm');
+    const payoutFormStatus = document.getElementById('payoutFormStatus');
+    const payoutInfoCards = document.getElementById('payoutInfoCards');
+    const payoutTabBtn = document.getElementById('payoutTabBtn');
 
     // --- State Variables ---
     let isAdmin = false;
@@ -312,7 +316,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(res => {
             if (res.status === 401) { window.location.href = '/login'; return Promise.reject('Session expired'); }
             if (!res.ok) { return res.json().then(errData => { throw new Error(errData.error || `Server error: ${res.status}`); }); }
-            return res.json();
+            return res.json;
         })
         .then(data => handleSearchSuccess(data))
         .catch(error => handleSearchFailure(error));
@@ -554,6 +558,68 @@ document.addEventListener('DOMContentLoaded', function() {
                 saveButton.disabled = false;
                 setTimeout(() => { saveStatusMessage.textContent = ''; saveStatusMessage.className = ''; }, 7000);
             }
+        });
+    }
+
+    // Handle payout form submission
+    if (payoutForm) {
+        payoutForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            payoutFormStatus.textContent = 'Submitting...';
+            const formData = new FormData(payoutForm);
+            try {
+                const res = await fetch('/api/payout/submit', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    payoutFormStatus.textContent = data.message;
+                    payoutForm.reset();
+                } else {
+                    payoutFormStatus.textContent = data.error || 'Submission failed.';
+                }
+            } catch (err) {
+                payoutFormStatus.textContent = 'Submission error.';
+            }
+        });
+    }
+
+    // Load payout cards for admin
+    async function loadPayoutCards() {
+        if (!isAdmin || !payoutInfoCards) return;
+        payoutInfoCards.innerHTML = 'Loading...';
+        try {
+            const res = await fetch('/api/payout/list');
+            const data = await res.json();
+            if (!data.success) {
+                payoutInfoCards.innerHTML = `<div class="error-message-main">${data.error || 'Failed to load.'}</div>`;
+                return;
+            }
+            if (!data.payouts.length) {
+                payoutInfoCards.innerHTML = '<div>No payout submissions yet.</div>';
+                return;
+            }
+            payoutInfoCards.innerHTML = data.payouts.map(p => `
+                <div class="payout-card">
+                    <div><strong>BA NAME:</strong> ${p.ba_name}</div>
+                    <div><strong>MOP ACCOUNT NAME:</strong> ${p.mop_account_name}</div>
+                    <div><strong>MOP NUMBER:</strong> ${p.mop_number}</div>
+                    <div><strong>Submitted by:</strong> ${p.user_email}</div>
+                    <div><strong>Date:</strong> ${new Date(p.submitted_at).toLocaleString()}</div>
+                    <div><img src="/uploads/${p.qr_image}" alt="QR" style="max-width:120px;max-height:120px;border:1px solid #ccc;"></div>
+                </div>
+            `).join('');
+        } catch (err) {
+            payoutInfoCards.innerHTML = '<div class="error-message-main">Failed to load.</div>';
+        }
+    }
+
+    // Show cards only for admin when payout tab is active
+    if (payoutTabBtn) {
+        payoutTabBtn.addEventListener('click', () => {
+            if (isAdmin) loadPayoutCards();
+            else if (payoutInfoCards) payoutInfoCards.innerHTML = '';
         });
     }
 
