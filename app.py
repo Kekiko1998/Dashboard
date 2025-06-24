@@ -99,18 +99,20 @@ def calculate_date_range(month_name, week_str):
         month_map = { "January": 1, "February": 2, "March": 3, "April": 4, "May": 5, "June": 6, "July": 7, "August": 8, "September": 9, "October": 10, "November": 11, "December": 12 }
         target_month_index = month_map.get(month_name)
         week_num = int(week_str.replace('Week ', ''))
-        if not target_month_index or week_num < 1: return ""
+        if not target_month_index or week_num < 1:
+            return ""
         year = datetime.now().year
         first_day_of_month = datetime(year, target_month_index, 1)
         days_to_subtract_for_monday = first_day_of_month.weekday()
         week1_start_date = first_day_of_month - timedelta(days=days_to_subtract_for_monday)
         selected_week_start_date = week1_start_date + timedelta(weeks=week_num - 1)
         selected_week_end_date = selected_week_start_date + timedelta(days=6)
-        start_month_name, end_month_name = selected_week_start_date.strftime("%B").upper(), selected_week_end_date.strftime("%B").upper()
+        start_month_name = selected_week_start_date.strftime('%B')
+        end_month_name = selected_week_end_date.strftime('%B')
         if start_month_name == end_month_name:
-            return f"{start_month_name} {selected_week_start_date.day} - {selected_week_end_date.day}"
+            return f"{selected_week_start_date.strftime('%b %d')} - {selected_week_end_date.strftime('%d, %Y')}"
         else:
-            return f"{start_month_name} {selected_week_start_date.day} - {end_month_name} {selected_week_end_date.day}"
+            return f"{selected_week_start_date.strftime('%b %d')} - {selected_week_end_date.strftime('%b %d, %Y')}"
     except Exception as e:
         logging.error(f"Error in calculate_date_range: {e}")
         return ""
@@ -129,7 +131,8 @@ def login():
 
 @app.route("/authorize")
 def authorize():
-    if not os.path.exists(CLIENT_SECRET_FILE): return "Error: client_secret.json not found.", 500
+    if not os.path.exists(CLIENT_SECRET_FILE):
+        return "Google client secret file missing.", 500
     flow = Flow.from_client_secrets_file(CLIENT_SECRET_FILE, scopes=SCOPES_OAUTH, redirect_uri=url_for('callback', _external=True))
     authorization_url, state = flow.authorization_url()
     session["state"] = state
@@ -151,25 +154,12 @@ def callback():
     user_map = {row[1].lower(): row for row in user_data[1:] if len(row) > 1}
 
     is_admin = user_email in [email.lower() for email in ADMIN_USER_EMAILS]
-    
     permissions = set()
-
     if user_email in user_map:
-        sheet_row = user_map[user_email]
-        if len(sheet_row) > 4 and sheet_row[4]:
-            permissions = set(p.strip() for p in sheet_row[4].split(','))
-    else:
-        # New user, add them to the sheet with default empty permissions
-        new_row = [user_id, user_email, user_name, str(is_admin).upper(), ""] # Empty permissions
-        sheet_api.values().append(
-            spreadsheetId=DATABASE_SHEET_ID,
-            range=f"{USERS_SHEET_NAME}!A1",
-            valueInputOption='USER_ENTERED',
-            body={'values': [new_row]}
-        ).execute()
-
+        row = user_map[user_email]
+        if len(row) > 4 and row[4]:
+            permissions = set(row[4].split(","))
     user = User(id=user_id, name=user_name, email=user_email, is_admin=is_admin, permissions=permissions)
-
     users[user_id] = user
     login_user(user)
     return redirect(url_for('index'))
@@ -195,22 +185,17 @@ def get_user_info():
 @login_required
 def get_all_users():
     if not current_user.is_admin:
-        return jsonify({"error": "Forbidden"}), 403
-    
+        return jsonify({'error': 'Forbidden'}), 403
     user_data = get_sheet_data(DATABASE_SHEET_ID, f"{USERS_SHEET_NAME}!B:E")
     if not user_data or len(user_data) < 2:
-        return jsonify({"users": [], "all_permissions": list(ALL_PERMISSIONS)})
-    
+        return jsonify({'users': [], 'all_permissions': list(ALL_PERMISSIONS)})
     users_list = []
     for row in user_data[1:]:
-        if len(row) > 0: # Check if row is not empty
-             is_admin_flag = row[2].upper() == 'TRUE' if len(row) > 2 else False
-             permissions_str = row[3] if len(row) > 3 else ""
-             users_list.append({
-                "email": row[0],
-                "name": row[1] if len(row) > 1 else "N/A",
-                "is_admin": is_admin_flag,
-                "permissions": [p.strip() for p in permissions_str.split(',') if p]
+        if len(row) >= 2:
+            users_list.append({
+                'name': row[0],
+                'email': row[1],
+                'permissions': row[3].split(",") if len(row) > 3 and row[3] else []
             })
     return jsonify({"users": users_list, "all_permissions": list(ALL_PERMISSIONS)})
 
@@ -218,19 +203,15 @@ def get_all_users():
 @login_required
 def update_user_permission():
     if not current_user.is_admin:
-        return jsonify({"success": False, "error": "Forbidden"}), 403
-
+        return jsonify({'error': 'Forbidden'}), 403
     data = request.get_json()
     target_email = data.get('email', '').lower()
     new_permissions = data.get('permissions', [])
-
     if not target_email:
-        return jsonify({"success": False, "error": "No email provided"}), 400
-    
+        return jsonify({'error': 'Missing email'}), 400
     user_data = get_sheet_data(DATABASE_SHEET_ID, f"{USERS_SHEET_NAME}!A:E")
     if not user_data:
-        return jsonify({"success": False, "error": "Could not read Users sheet"}), 500
-    
+        return jsonify({'error': 'User data not found'}), 404
     row_index_to_update = -1
     is_target_root_admin = False
     for i, row in enumerate(user_data):
@@ -239,12 +220,11 @@ def update_user_permission():
             if row[1].lower() in [email.lower() for email in ADMIN_USER_EMAILS]:
                 is_target_root_admin = True
             break
-    
-    if row_index_to_update == -1: return jsonify({"success": False, "error": "User not found"}), 404
-    if is_target_root_admin: return jsonify({"success": False, "error": "Cannot change permissions for a root admin"}), 400
-
+    if row_index_to_update == -1:
+        return jsonify({'error': 'User not found'}), 404
+    if is_target_root_admin:
+        return jsonify({'error': 'Cannot change root admin permissions'}), 403
     permissions_string = ",".join(sorted(new_permissions))
-    
     range_to_update = f"{USERS_SHEET_NAME}!E{row_index_to_update}"
     sheet_api.values().update(
         spreadsheetId=DATABASE_SHEET_ID,
@@ -252,14 +232,14 @@ def update_user_permission():
         valueInputOption='RAW',
         body={'values': [[permissions_string]]}
     ).execute()
-
     return jsonify({"success": True, "message": f"Permissions for {target_email} updated."})
 
 @app.route('/api/ba-names', methods=['GET'])
 @login_required
 def get_unique_ba_names():
     data = get_sheet_data(DATABASE_SHEET_ID, f"{DATABASE_SHEET_NAME}!A:L")
-    if not data or len(data) <= 1: return jsonify([])
+    if not data or len(data) <= 1:
+        return jsonify([])
     ba_names = set(row[3].strip() for row in data[1:] if len(row) > 3 and row[3])
     return jsonify(sorted(list(ba_names)))
 
@@ -267,15 +247,17 @@ def get_unique_ba_names():
 @login_required
 def search_dashboard_data():
     req_data = request.get_json()
-    month, week, ba_names, palcode = req_data.get('month'), req_data.get('week'), req_data.get('baNames', []), req_data.get('palcode', '')
-    
-    if not month or not week: return jsonify({"error": "Month and Week are required."}), 400
+    month = req_data.get('month')
+    week = req_data.get('week')
+    ba_names = req_data.get('baNames', [])
+    palcode = req_data.get('palcode', '')
+    if not month or not week:
+        return jsonify({'error': 'Month and week required'}), 400
     if not ba_names and 'SEARCH_ALL' not in current_user.permissions:
-        return jsonify({"error": "BA Name is required."}), 400
-    
+        return jsonify({'error': 'BA name required'}), 400
     all_sheet_data = get_sheet_data(DATABASE_SHEET_ID, f"{DATABASE_SHEET_NAME}!A:L")
-    if all_sheet_data is None: return jsonify({"error": "Database sheet not found or API failed."}), 500
-        
+    if all_sheet_data is None:
+        return jsonify({'error': 'Database unavailable'}), 500
     log_user_event('searchDashboardData', req_data)
     search_month, search_week = month.strip().lower(), week.strip().lower()
     search_ba_names_lower = [str(name).strip().lower() for name in ba_names if name]
@@ -403,7 +385,7 @@ def submit_payout():
     if not all([ba_name, mop_account_name, mop_number, qr_file]):
         return jsonify({'success': False, 'error': 'All fields are required.'}), 400
 
-    filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{qr_file.filename}"
+    filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(qr_file.filename)}"
     file_path = os.path.join(PAYOUT_UPLOAD_FOLDER, filename)
     qr_file.save(file_path)
 
