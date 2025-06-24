@@ -19,9 +19,7 @@
             <button id="homeTabBtn" class="tab-button active" onclick="showTab('homeArea', this)">Home</button>
             <button id="dashboardTabBtn" class="tab-button" onclick="showTab('dashboardDisplayArea', this)">Dashboard</button>
             <button id="salaryTabBtn" class="tab-button" onclick="showTab('salarySchemeArea', this)">Salary Scheme</button>
-            <!-- ================== NEW ADMIN TAB (hidden by default) ================== -->
             <button id="adminTabBtn" class="tab-button" onclick="showTab('adminArea', this)" style="display: none;">Admin</button>
-            <!-- ======================================================================= -->
             <button id="payoutTabBtn" class="tab-button" onclick="showTab('payoutArea', this)">Payout</button>
         </div>
         <div id="userInfo" class="user-info" style="display: none;">
@@ -55,8 +53,23 @@
                             <option value="Week 4">Week 4</option>
                             <option id="week5Option" value="Week 5">Week 5</option>
                         </select>
-                        <input type="text" id="baNameInput" placeholder="ENTER BA NAME" autocomplete="on" list="baNameSuggestions">
-                        <datalist id="baNameSuggestions"></datalist>
+                        
+                        <!-- *** FIX: Added container for all BA name inputs *** -->
+                        <div class="ba-name-input-container">
+                            <!-- Input for regular users -->
+                            <input type="text" id="baNameInput" placeholder="ENTER BA NAME" autocomplete="on" list="baNameSuggestions" style="display: none;">
+                            <datalist id="baNameSuggestions"></datalist>
+
+                            <!-- Container for multi-select dropdown for special users -->
+                            <div id="baNameSelectContainer" style="display: none;">
+                                <button id="baNameSelectButton" type="button">SELECT BA NAME</button>
+                                <div id="baNameDropdown" class="ba-dropdown">
+                                    <input type="text" id="baNameSearchInput" placeholder="Search names...">
+                                    <div id="baNameCheckboxList"></div>
+                                </div>
+                            </div>
+                        </div>
+
                         <input type="text" id="palcodeInput" placeholder="ENTER PALCODE (OPTIONAL)">
                         <button id="searchButton" class="search-button">SEARCH</button>
                     </div>
@@ -142,23 +155,23 @@
             </div>
         </div>
 
-        <!-- ================== NEW ADMIN AREA CONTENT ================== -->
+        <!-- ADMIN AREA CONTENT -->
         <div id="adminArea" class="tab-content">
             <div class="admin-panel-container">
                 <h1>User Management</h1>
-                <p>Grant or revoke specific permissions for users. Admins have all permissions by default and cannot be changed.</p>
+                <p>Grant or revoke specific permissions for users. Root Admins have all permissions by default and their roles cannot be changed here.</p>
                 <div id="adminStatusMessage" class="admin-status-message"></div>
                 <div id="userManagementTableContainer">
                     <div class="loading-indicator">⏳ Loading users...</div>
                 </div>
             </div>
         </div>
-        <!-- ========================================================== -->
 
         <!-- PAYOUT FORM TAB CONTENT -->
         <div id="payoutArea" class="tab-content">
           <div class="payout-form-container">
             <h2>Payout Submission</h2>
+            <p>Submit your payout details here. For admins, a list of all submissions will appear below this form.</p>
             <form id="payoutForm" enctype="multipart/form-data">
               <label>BA NAME:<br><input type="text" name="ba_name" required></label><br>
               <label>MOP ACCOUNT NAME:<br><input type="text" name="mop_account_name" required></label><br>
@@ -168,7 +181,10 @@
               <span id="payoutFormStatus"></span>
             </form>
           </div>
-          <div id="payoutInfoCards" style="margin-top:2em;"></div>
+          <div id="payoutListContainer">
+              <h2 id="payoutListTitle" style="display:none; text-align:center; margin-top:2em;">All Payout Submissions</h2>
+              <div id="payoutInfoCards"></div>
+          </div>
         </div>
 
     </div>
