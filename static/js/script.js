@@ -191,14 +191,14 @@ document.addEventListener('DOMContentLoaded', function() {
         userManagementTableContainer.innerHTML = '';
         const table = document.createElement('table'); table.id = 'userManagementTable';
         const thead = document.createElement('thead');
-        let headerRowHtml = '<tr><th>Name</th><th>Email</th>'; 
+        let headerRowHtml = '<tr><th>Email</th><th>Name</th>'; 
         allPermissions.forEach(perm => { headerRowHtml += `<th>${perm.replace(/_/g, ' ')}</th>`; });
         headerRowHtml += '<th>Action</th></tr>';
         thead.innerHTML = headerRowHtml; table.appendChild(thead);
         const tbody = document.createElement('tbody');
         users.forEach(user => {
-            const tr = document.createElement('tr'); tr.dataset.email = user.email;
-            let rowHtml = `<td>${user.email}</td><td>${user.name}</td>`; 
+            const tr = document.createElement('tr');
+            let rowHtml = `<td>${user.email}</td><td>${user.name}</td>`;
             const userPerms = new Set(user.permissions);
             allPermissions.forEach(perm => {
                 const isChecked = userPerms.has(perm) ? 'checked' : '';
@@ -214,17 +214,31 @@ document.addEventListener('DOMContentLoaded', function() {
             button.addEventListener('click', handlePermissionSave);
         });
     }
+
+    // *** CORRECTED ***: Reads the email from the first cell of the row instead of a non-existent data attribute.
     function handlePermissionSave(event) {
         const button = event.target;
         const row = button.closest('tr');
-        const email = row.dataset.email;
+        const email = row.cells[0].textContent; // Get email from the first table cell
+        
+        if (!email) {
+            adminStatusMessage.textContent = `Error: Could not find email for this row.`;
+            adminStatusMessage.className = 'admin-status-message error';
+            return;
+        }
+
         const selectedPermissions = [];
         row.querySelectorAll('input[type="checkbox"]:checked').forEach(checkbox => {
             selectedPermissions.push(checkbox.dataset.permission);
         });
-        button.textContent = 'Saving...'; button.disabled = true; adminStatusMessage.textContent = '';
+        
+        button.textContent = 'Saving...'; 
+        button.disabled = true; 
+        adminStatusMessage.textContent = '';
+
         fetch('/api/update_user_permission', {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ email: email, permissions: selectedPermissions })
         }).then(res => res.json()).then(data => {
             if (data.success) {
@@ -236,7 +250,11 @@ document.addEventListener('DOMContentLoaded', function() {
             adminStatusMessage.className = 'admin-status-message error';
         }).finally(() => {
             button.textContent = 'Save';
-            if (!row.querySelector('input[type=checkbox]').disabled) { button.disabled = false; }
+            // Only re-enable the button if it's not for a root admin
+            const firstCheckbox = row.querySelector('input[type=checkbox]');
+            if (!firstCheckbox || !firstCheckbox.disabled) {
+                button.disabled = false;
+            }
             setTimeout(() => { adminStatusMessage.textContent = ''; adminStatusMessage.className = 'admin-status-message'; }, 5000);
         });
     }
@@ -378,8 +396,6 @@ document.addEventListener('DOMContentLoaded', function() {
             
             data.resultsTable.forEach((rowData, rowIndex) => {
                 const tr = document.createElement('tr');
-                
-                // *** MODIFIED ***: Store the composite key parts in the row's dataset
                 tr.dataset.palcode = rowData[0];
                 tr.dataset.month = rowData[1];
                 tr.dataset.week = rowData[2];
@@ -422,7 +438,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
             tableRows.forEach(row => {
                 const statusElement = row.querySelector('[data-field="status"]');
-                // *** MODIFIED ***: Send the original month and week as part of the payload
                 const rowData = {
                     palcode: row.dataset.palcode,
                     original_month: row.dataset.month,
