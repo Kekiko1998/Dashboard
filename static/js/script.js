@@ -3,20 +3,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const userInfoDiv = document.getElementById('userInfo');
     const userNameSpan = document.getElementById('userName');
     
-    // Search control containers
     const homeContentCentered = document.getElementById('homeContentCentered');
     const homeSearchControlsContainer = document.getElementById('homeSearchControlsContainer');
     const topLeftDynamicContent = document.getElementById('topLeftDynamicContent');
     const homeTitleContainer = document.getElementById('homeTitleContainer');
     
-    // Search controls
     const searchButton = document.getElementById('searchButton');
     const monthSelect = document.getElementById('monthSelect');
     const weekSelect = document.getElementById('weekSelect');
     const palcodeInput = document.getElementById('palcodeInput');
     const homeErrorMessage = document.getElementById('homeErrorMessage');
 
-    // Single and Multi-select BA inputs
     const baNameInput = document.getElementById('baNameInput'); 
     const baNameSelectContainer = document.getElementById('baNameSelectContainer');
     const baNameSelectButton = document.getElementById('baNameSelectButton');
@@ -24,7 +21,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const baNameSearchInput = document.getElementById('baNameSearchInput');
     const baNameCheckboxList = document.getElementById('baNameCheckboxList');
 
-    // Tab and Display Area elements
     const dashboardTabBtn = document.getElementById('dashboardTabBtn');
     const dashboardPlaceholder = document.getElementById('dashboardPlaceholder');
     const loadingIndicator = document.getElementById('loadingIndicator');
@@ -32,7 +28,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const dashboardSearchError = document.getElementById('dashboardSearchError');
     const darkModeToggleButton = document.getElementById('darkModeToggle');
     
-    // Admin elements
     const adminTabBtn = document.getElementById('adminTabBtn');
     const userManagementTableContainer = document.getElementById('userManagementTableContainer');
     const adminStatusMessage = document.getElementById('adminStatusMessage');
@@ -40,7 +35,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const saveButton = document.getElementById('saveButton');
     const saveStatusMessage = document.getElementById('saveStatusMessage');
     
-    // Payout elements
     const payoutForm = document.getElementById('payoutForm');
     const payoutFormStatus = document.getElementById('payoutFormStatus');
     const payoutInfoCards = document.getElementById('payoutInfoCards');
@@ -112,10 +106,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // *** CORRECTED ***: Simplified and more robust event listeners for the dropdown.
     if (baNameSelectButton) {
         baNameSelectButton.addEventListener('click', (event) => {
-            event.stopPropagation(); // Prevent the window click listener from firing immediately
+            event.stopPropagation();
             baNameDropdown.classList.toggle('show');
         });
     }
@@ -129,7 +122,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Hide dropdown if clicked outside
     window.addEventListener('click', (event) => {
         if (baNameDropdown && !baNameSelectContainer.contains(event.target)) {
             baNameDropdown.classList.remove('show');
@@ -192,7 +184,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (searchButton) { searchButton.addEventListener('click', performSearch); }
     
-    // --- Admin Panel Functions ---
+    // ... all other functions remain the same ...
+    // The following functions are correct and do not need changes.
     function loadUserManagementPanel() {
         userManagementTableContainer.innerHTML = '<div class="loading-indicator">⏳ Loading users...</div>';
         adminStatusMessage.textContent = '';
@@ -277,7 +270,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- Search & Data Handling ---
     function performSearch() {
         const month = monthSelect.value, week = weekSelect.value, palcode = palcodeInput.value.trim();
         let baNamesToSearch = [];
