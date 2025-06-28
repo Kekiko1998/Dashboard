@@ -1,0 +1,10 @@
+# Secret credentials
+credentials.json
+gcs_credentials.json
+
+# Python virtual environment
+venv/
+__pycache__/
+
+# BFG Repo-Cleaner backup files
+*.bfg-report
