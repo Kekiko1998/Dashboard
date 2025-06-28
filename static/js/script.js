@@ -187,13 +187,21 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // *** CORRECTED ***: Swapped the column order back to NAME | EMAIL to match the image.
     function buildUserTable(users, allPermissions) {
         userManagementTableContainer.innerHTML = '';
         const table = document.createElement('table'); table.id = 'userManagementTable';
         const thead = document.createElement('thead');
         
-        let headerRowHtml = '<tr><th>Email</th><th>Name</th>'; 
-        allPermissions.forEach(perm => { headerRowHtml += `<th>${perm.replace(/_/g, ' ')}</th>`; });
+        let headerRowHtml = '<tr><th>Name</th><th>Email</th>'; 
+        
+        const displayOrder = ['EDIT_TABLE', 'SEARCH_ALL', 'VIEW_COMMISSION', 'VIEW_PAYOUTS', 'MULTI_SELECT'];
+        displayOrder.forEach(perm => { 
+            if (allPermissions.includes(perm)) {
+                headerRowHtml += `<th>${perm.replace(/_/g, ' ')}</th>`;
+            }
+        });
+        
         headerRowHtml += '<th>Action</th></tr>';
         thead.innerHTML = headerRowHtml; table.appendChild(thead);
         
@@ -201,14 +209,15 @@ document.addEventListener('DOMContentLoaded', function() {
         users.forEach(user => {
             const tr = document.createElement('tr');
             
-            // *** CORRECTED ***: Ensured the cell data order matches the header order (Email first, then Name).
-            let rowHtml = `<td>${user.email}</td><td>${user.name}</td>`; 
+            let rowHtml = `<td>${user.name}</td><td>${user.email}</td>`;
             
             const userPerms = new Set(user.permissions);
-            allPermissions.forEach(perm => {
-                const isChecked = userPerms.has(perm) ? 'checked' : '';
-                const isDisabled = user.is_admin ? 'disabled' : '';
-                rowHtml += `<td><label class="switch"><input type="checkbox" data-permission="${perm}" ${isChecked} ${isDisabled}><span class="slider round"></span></label></td>`;
+            displayOrder.forEach(perm => {
+                 if (allPermissions.includes(perm)) {
+                    const isChecked = userPerms.has(perm) ? 'checked' : '';
+                    const isDisabled = user.is_admin ? 'disabled' : '';
+                    rowHtml += `<td><label class="switch"><input type="checkbox" data-permission="${perm}" ${isChecked} ${isDisabled}><span class="slider round"></span></label></td>`;
+                }
             });
             const saveButtonDisabled = user.is_admin ? 'disabled' : '';
             rowHtml += `<td><button class="save-permissions-btn" ${saveButtonDisabled}>Save</button></td>`;
@@ -223,7 +232,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function handlePermissionSave(event) {
         const button = event.target;
         const row = button.closest('tr');
-        const email = row.cells[0].textContent; 
+        const email = row.cells[1].textContent; // Email is now in the SECOND cell (index 1)
         
         if (!email) {
             adminStatusMessage.textContent = `Error: Could not find email for this row.`;

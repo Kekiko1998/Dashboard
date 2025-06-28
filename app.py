@@ -24,10 +24,10 @@ USERS_SHEET_NAME = 'Users'
 ADMIN_USER_EMAILS = ['harrypobreza@gmail.com'] 
 ALL_PERMISSIONS = {
     'MULTI_SELECT',
-    'SEARCH_ALL',
     'EDIT_TABLE',
     'VIEW_COMMISSION',
-    'VIEW_PAYOUTS' 
+    'VIEW_PAYOUTS',
+    'SEARCH_ALL'
 }
 YOUR_TIMEZONE = 'Asia/Manila'
 PAYOUT_UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'payout_uploads')
@@ -176,26 +176,34 @@ def get_user_info():
         "permissions": list(current_user.permissions)
     })
 
+# *** CORRECTED ***: Fetches Name from column C and Email from column B to match the Sheet.
 @app.route('/api/users', methods=['GET'])
 @login_required
 def get_all_users():
     if not current_user.is_admin:
         return jsonify({'error': 'Forbidden'}), 403
+    
+    # Fetching columns B through E (Email, Name, Role, Permissions)
     user_data = get_sheet_data(DATABASE_SHEET_ID, f"{USERS_SHEET_NAME}!B:E")
     if not user_data or len(user_data) < 2:
-        return jsonify({'users': [], 'all_permissions': list(ALL_PERMISSIONS)})
+        return jsonify({'users': [], 'all_permissions': sorted(list(ALL_PERMISSIONS))})
+    
     users_list = []
     admin_emails_lower = [email.lower() for email in ADMIN_USER_EMAILS]
     for row in user_data[1:]:
         if len(row) >= 2:
-            user_email = row[1].lower()
+            # Column B is Email (index 0 in row), Column C is Name (index 1 in row)
+            user_email = row[0].lower()
+            user_name = row[1]
+            
             users_list.append({
-                'name': row[0],
+                'name': user_name,
                 'email': user_email,
                 'is_admin': user_email in admin_emails_lower,
                 'permissions': row[3].split(",") if len(row) > 3 and row[3] else []
             })
-    return jsonify({"users": users_list, "all_permissions": list(ALL_PERMISSIONS)})
+    return jsonify({"users": users_list, "all_permissions": sorted(list(ALL_PERMISSIONS))})
+
 
 @app.route('/api/update_user_permission', methods=['POST'])
 @login_required
@@ -314,7 +322,6 @@ def search_dashboard_data():
         elif 'SEARCH_ALL' in current_user.permissions: summary_for_display['totalIncentives'] = sum_of_all_individual_incentives
     return jsonify({ "baNameDisplay": ba_display_name, "searchCriteria": search_criteria_frontend, "summary": summary_for_display, "monthDisplay": search_month.upper(), "weekDisplay": search_week.upper(), "dateRangeDisplay": date_range_display, "status": "Active", "resultsTable": results_for_table, "rankedBaList": final_ranked_ba_list, "lastUpdate": last_update_timestamp })
 
-# *** MODIFIED ***: Save logic now uses a composite key to find the exact row, preventing overwrites.
 @app.route('/api/save_dashboard', methods=['POST'])
 @login_required
 def save_dashboard():
@@ -327,14 +334,11 @@ def save_dashboard():
         all_sheet_data = get_sheet_data(DATABASE_SHEET_ID, f"{DATABASE_SHEET_NAME}!A:L")
         if not all_sheet_data:
             return jsonify({"success": False, "error": "Could not fetch current database state."}), 500
-        
-        # Build a map with a composite key for precise lookups
         row_map = {}
         for i, row in enumerate(all_sheet_data):
-            if len(row) > 2: # Ensure we have palcode, month, and week
-                key = f"{row[0]}|{row[1]}|{row[2]}" # e.g., "AGT027913|JUNE|WEEK 4"
+            if len(row) > 2:
+                key = f"{row[0]}|{row[1]}|{row[2]}"
                 row_map[key] = {'data': row, 'index': i + 1}
-
         update_requests = []
         editable_cols = {
             'month': {'idx': 1, 'col': 'B'}, 'week': {'idx': 2, 'col': 'C'}, 'ba_name': {'idx': 3, 'col': 'D'},
@@ -342,13 +346,10 @@ def save_dashboard():
             'total_ggr': {'idx': 9, 'col': 'J'}, 'status': {'idx': 11, 'col': 'L'}
         }
         for client_row in updated_rows_from_client:
-            # Reconstruct the composite key from the data sent by the client
             palcode = client_row.get('palcode')
             original_month = client_row.get('original_month')
             original_week = client_row.get('original_week')
-            
             key = f"{palcode}|{original_month}|{original_week}"
-
             if key in row_map:
                 original_row = row_map[key]['data']
                 original_index = row_map[key]['index']
@@ -361,7 +362,6 @@ def save_dashboard():
                             "range": f"'{DATABASE_SHEET_NAME}'!{col_info['col']}{original_index}",
                             "values": [[client_value]]
                         })
-                        
         if not update_requests:
             return jsonify({"success": True, "message": "No changes detected to save."})
         batch_update_body = { 'valueInputOption': 'USER_ENTERED', 'data': update_requests }
