@@ -191,7 +191,7 @@ document.addEventListener('DOMContentLoaded', function() {
         userManagementTableContainer.innerHTML = '';
         const table = document.createElement('table'); table.id = 'userManagementTable';
         const thead = document.createElement('thead');
-        let headerRowHtml = '<tr><th>Email</th><th>Name</th>'; 
+        let headerRowHtml = '<tr><th>Name</th><th>Email</th>'; 
         allPermissions.forEach(perm => { headerRowHtml += `<th>${perm.replace(/_/g, ' ')}</th>`; });
         headerRowHtml += '<th>Action</th></tr>';
         thead.innerHTML = headerRowHtml; table.appendChild(thead);
