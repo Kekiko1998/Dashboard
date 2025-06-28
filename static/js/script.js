@@ -2,33 +2,45 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Get all relevant DOM elements ---
     const userInfoDiv = document.getElementById('userInfo');
     const userNameSpan = document.getElementById('userName');
+    
+    // Search control containers
     const homeContentCentered = document.getElementById('homeContentCentered');
-    const homeTitleContainer = document.getElementById('homeTitleContainer');
     const homeSearchControlsContainer = document.getElementById('homeSearchControlsContainer');
     const topLeftDynamicContent = document.getElementById('topLeftDynamicContent');
+    const homeTitleContainer = document.getElementById('homeTitleContainer');
+    
+    // Search controls
     const searchButton = document.getElementById('searchButton');
     const monthSelect = document.getElementById('monthSelect');
     const weekSelect = document.getElementById('weekSelect');
-    let baNameInput = document.getElementById('baNameInput'); 
     const palcodeInput = document.getElementById('palcodeInput');
     const homeErrorMessage = document.getElementById('homeErrorMessage');
+
+    // Single and Multi-select BA inputs
+    const baNameInput = document.getElementById('baNameInput'); 
+    const baNameSelectContainer = document.getElementById('baNameSelectContainer');
+    const baNameSelectButton = document.getElementById('baNameSelectButton');
+    const baNameDropdown = document.getElementById('baNameDropdown');
+    const baNameSearchInput = document.getElementById('baNameSearchInput');
+    const baNameCheckboxList = document.getElementById('baNameCheckboxList');
+
+    // Tab and Display Area elements
     const dashboardTabBtn = document.getElementById('dashboardTabBtn');
     const dashboardPlaceholder = document.getElementById('dashboardPlaceholder');
     const loadingIndicator = document.getElementById('loadingIndicator');
     const dashboardDataDisplay = document.getElementById('dashboardDataDisplay');
     const dashboardSearchError = document.getElementById('dashboardSearchError');
     const darkModeToggleButton = document.getElementById('darkModeToggle');
+    
+    // Admin elements
     const adminTabBtn = document.getElementById('adminTabBtn');
     const userManagementTableContainer = document.getElementById('userManagementTableContainer');
     const adminStatusMessage = document.getElementById('adminStatusMessage');
     const tableControls = document.getElementById('tableControls');
     const saveButton = document.getElementById('saveButton');
     const saveStatusMessage = document.getElementById('saveStatusMessage');
-    const baNameSelectContainer = document.getElementById('baNameSelectContainer');
-    const baNameSelectButton = document.getElementById('baNameSelectButton');
-    const baNameDropdown = document.getElementById('baNameDropdown');
-    const baNameSearchInput = document.getElementById('baNameSearchInput');
-    const baNameCheckboxList = document.getElementById('baNameCheckboxList');
+    
+    // Payout elements
     const payoutForm = document.getElementById('payoutForm');
     const payoutFormStatus = document.getElementById('payoutFormStatus');
     const payoutInfoCards = document.getElementById('payoutInfoCards');
@@ -100,25 +112,30 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // *** CORRECTED ***: Simplified and more robust event listeners for the dropdown.
     if (baNameSelectButton) {
-        baNameSelectButton.addEventListener('click', function(e) {
+        baNameSelectButton.addEventListener('click', (event) => {
+            event.stopPropagation(); // Prevent the window click listener from firing immediately
             baNameDropdown.classList.toggle('show');
-            e.stopPropagation();
         });
     }
+
     if (baNameSearchInput) {
-        baNameSearchInput.addEventListener('input', function() {
+        baNameSearchInput.addEventListener('input', () => {
             const filter = baNameSearchInput.value.toLowerCase();
             Array.from(baNameCheckboxList.children).forEach(label => {
                 label.style.display = label.textContent.toLowerCase().includes(filter) ? '' : 'none';
             });
         });
     }
-    window.addEventListener('click', function(e) {
-        if (baNameDropdown && !baNameDropdown.contains(e.target) && !baNameSelectButton.contains(e.target)) {
+    
+    // Hide dropdown if clicked outside
+    window.addEventListener('click', (event) => {
+        if (baNameDropdown && !baNameSelectContainer.contains(event.target)) {
             baNameDropdown.classList.remove('show');
         }
     });
+
 
     // --- UI MANAGEMENT ---
     function setDarkMode(isDark) {
