@@ -191,14 +191,19 @@ document.addEventListener('DOMContentLoaded', function() {
         userManagementTableContainer.innerHTML = '';
         const table = document.createElement('table'); table.id = 'userManagementTable';
         const thead = document.createElement('thead');
+        
         let headerRowHtml = '<tr><th>Email</th><th>Name</th>'; 
         allPermissions.forEach(perm => { headerRowHtml += `<th>${perm.replace(/_/g, ' ')}</th>`; });
         headerRowHtml += '<th>Action</th></tr>';
         thead.innerHTML = headerRowHtml; table.appendChild(thead);
+        
         const tbody = document.createElement('tbody');
         users.forEach(user => {
             const tr = document.createElement('tr');
-            let rowHtml = `<td>${user.email}</td><td>${user.name}</td>`;
+            
+            // *** CORRECTED ***: Ensured the cell data order matches the header order (Email first, then Name).
+            let rowHtml = `<td>${user.email}</td><td>${user.name}</td>`; 
+            
             const userPerms = new Set(user.permissions);
             allPermissions.forEach(perm => {
                 const isChecked = userPerms.has(perm) ? 'checked' : '';
@@ -215,11 +220,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // *** CORRECTED ***: Reads the email from the first cell of the row instead of a non-existent data attribute.
     function handlePermissionSave(event) {
         const button = event.target;
         const row = button.closest('tr');
-        const email = row.cells[0].textContent; // Get email from the first table cell
+        const email = row.cells[0].textContent; 
         
         if (!email) {
             adminStatusMessage.textContent = `Error: Could not find email for this row.`;
@@ -250,7 +254,6 @@ document.addEventListener('DOMContentLoaded', function() {
             adminStatusMessage.className = 'admin-status-message error';
         }).finally(() => {
             button.textContent = 'Save';
-            // Only re-enable the button if it's not for a root admin
             const firstCheckbox = row.querySelector('input[type=checkbox]');
             if (!firstCheckbox || !firstCheckbox.disabled) {
                 button.disabled = false;
