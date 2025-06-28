@@ -187,30 +187,23 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // *** CORRECTED ***: Swapped the column order back to NAME | EMAIL to match the image.
     function buildUserTable(users, allPermissions) {
         userManagementTableContainer.innerHTML = '';
         const table = document.createElement('table'); table.id = 'userManagementTable';
         const thead = document.createElement('thead');
-        
-        let headerRowHtml = '<tr><th>Name</th><th>Email</th>'; 
-        
         const displayOrder = ['EDIT_TABLE', 'SEARCH_ALL', 'VIEW_COMMISSION', 'VIEW_PAYOUTS', 'MULTI_SELECT'];
+        let headerRowHtml = '<tr><th>Name</th><th>Email</th>'; 
         displayOrder.forEach(perm => { 
             if (allPermissions.includes(perm)) {
                 headerRowHtml += `<th>${perm.replace(/_/g, ' ')}</th>`;
             }
         });
-        
         headerRowHtml += '<th>Action</th></tr>';
         thead.innerHTML = headerRowHtml; table.appendChild(thead);
-        
         const tbody = document.createElement('tbody');
         users.forEach(user => {
             const tr = document.createElement('tr');
-            
             let rowHtml = `<td>${user.name}</td><td>${user.email}</td>`;
-            
             const userPerms = new Set(user.permissions);
             displayOrder.forEach(perm => {
                  if (allPermissions.includes(perm)) {
@@ -232,23 +225,19 @@ document.addEventListener('DOMContentLoaded', function() {
     function handlePermissionSave(event) {
         const button = event.target;
         const row = button.closest('tr');
-        const email = row.cells[1].textContent; // Email is now in the SECOND cell (index 1)
-        
+        const email = row.cells[1].textContent; 
         if (!email) {
             adminStatusMessage.textContent = `Error: Could not find email for this row.`;
             adminStatusMessage.className = 'admin-status-message error';
             return;
         }
-
         const selectedPermissions = [];
         row.querySelectorAll('input[type="checkbox"]:checked').forEach(checkbox => {
             selectedPermissions.push(checkbox.dataset.permission);
         });
-        
         button.textContent = 'Saving...'; 
         button.disabled = true; 
         adminStatusMessage.textContent = '';
-
         fetch('/api/update_user_permission', {
             method: 'POST', 
             headers: {'Content-Type': 'application/json'},
@@ -545,8 +534,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div><strong>MOP NUMBER:</strong> ${p.mop_number}</div>
                     <div><strong>Submitted by:</strong> ${p.user_email}</div>
                     <div><strong>Date:</strong> ${new Date(p.submitted_at).toLocaleString()}</div>
-                    <a href="/uploads/${p.qr_image}" target="_blank" title="View full size QR">
-                        <img src="/uploads/${p.qr_image}" alt="QR Code">
+                    <a href="${p.qr_image}" target="_blank" title="View full size QR">
+                        <img src="${p.qr_image}" alt="QR Code">
                     </a>
                     ${isAdmin ? `<button class="delete-payout-btn" data-payout-id="${p.submitted_at}">Delete</button>` : ''}
                 </div>
