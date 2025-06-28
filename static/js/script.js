@@ -106,19 +106,33 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // New, robust dropdown logic
     if (baNameSelectButton) {
+        // Move dropdown to the body to avoid overflow issues from parent containers
+        document.body.appendChild(baNameDropdown);
+
         baNameSelectButton.addEventListener('click', (event) => {
+            // Stop this click from closing the dropdown immediately
             event.stopPropagation();
+            
+            // Calculate position right before showing
+            const rect = baNameSelectButton.getBoundingClientRect();
+            baNameDropdown.style.top = `${rect.bottom + window.scrollY + 2}px`; // Position below the button, accounting for scroll
+            baNameDropdown.style.left = `${rect.left + window.scrollX}px`; // Align with the left of the button
+            baNameDropdown.style.width = `${rect.width}px`; // Match the button's width
+
             baNameDropdown.classList.toggle('show');
         });
     }
 
+    // This listener will close the dropdown if you click anywhere else on the page
     window.addEventListener('click', () => {
         if (baNameDropdown.classList.contains('show')) {
             baNameDropdown.classList.remove('show');
         }
     });
 
+    // This stops clicks *inside* the dropdown from closing it
     if(baNameDropdown) {
         baNameDropdown.addEventListener('click', (event) => {
             event.stopPropagation();

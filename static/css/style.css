@@ -372,8 +372,14 @@ input:checked + .slider:before { transform: translateX(22px); }
 .delete-payout-btn:hover { background-color: var(--error-color-darker); }
 .delete-payout-btn:disabled { background-color: #5a6268; cursor: not-allowed; opacity: 0.7; }
 
+/* ... All other CSS rules remain the same until the Multi-Select section ... */
+
 /* --- Multi-Select BA Name Dropdown --- */
-.ba-name-select-wrapper { position: relative; padding: 0 !important; border: none !important; }
+.ba-name-select-wrapper { 
+    position: relative; /* This is still needed for context */
+    padding: 0 !important; 
+    border: none !important; 
+}
 #baNameSelectButton {
     font-family: var(--bebas-font);
     font-size: inherit;
@@ -401,21 +407,20 @@ input:checked + .slider:before { transform: translateX(22px); }
 }
 #baNameSelectButton.has-selection { color: var(--input-text); }
 
-/* *** CORRECTED ***: High z-index to ensure it appears above other content */
+/* *** CORRECTED ***: Styles for a dropdown attached to the body */
 .ba-dropdown {
     display: none;
-    position: absolute;
+    position: absolute; /* Changed from fixed back to absolute, but JS now handles coords */
     background: var(--panel-bg, #222);
     border: 1px solid var(--input-border-color, #444);
     border-radius: 4px;
-    z-index: 1001; /* High z-index */
-    width: 250px;
+    z-index: 9999; /* Very high z-index to ensure it's on top */
     max-height: 300px;
     overflow-y: auto;
     box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    margin-top: 5px;
 }
 .ba-dropdown.show { display: block; }
+
 #baNameSearchInput { width: calc(100% - 20px); box-sizing: border-box; margin: 8px; padding: 5px; background-color: var(--body-bg); border: 1px solid var(--input-border-color); color: var(--input-text); border-radius: 3px; }
 #baNameSearchInput:focus { border-color: var(--primary-blue); outline: none; }
 #baNameCheckboxList { padding: 5px; }
