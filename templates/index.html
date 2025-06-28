@@ -53,15 +53,22 @@
                             <option value="Week 4">Week 4</option>
                             <option id="week5Option" value="Week 5">Week 5</option>
                         </select>
+                        
+                        <!-- SINGLE BA NAME INPUT (for users without permission) -->
                         <input type="text" id="baNameInput" placeholder="ENTER BA NAME" autocomplete="on" list="baNameSuggestions" style="display: block;">
                         <datalist id="baNameSuggestions"></datalist>
+
+                        <!-- *** CORRECTED ***: The full HTML for the multi-select dropdown is now here. -->
                         <div id="baNameSelectContainer" class="ba-name-select-wrapper" style="display: none;">
                             <button id="baNameSelectButton">SELECT BA NAME</button>
                             <div id="baNameDropdown" class="ba-dropdown">
                                 <input type="text" id="baNameSearchInput" placeholder="Search for BA...">
-                                <div id="baNameCheckboxList"></div>
+                                <div id="baNameCheckboxList">
+                                    <!-- Checkboxes populated by JS -->
+                                </div>
                             </div>
                         </div>
+
                         <input type="text" id="palcodeInput" placeholder="ENTER PALCODE (OPTIONAL)">
                         <button id="searchButton" class="search-button">SEARCH</button>
                     </div>
@@ -161,7 +168,6 @@
 
         <!-- PAYOUT FORM TAB CONTENT -->
         <div id="payoutArea" class="tab-content">
-          <!-- *** NEW/MODIFIED MARKUP FOR PAYOUT FORM *** -->
           <div class="payout-reminders">
               <h3>Important Reminders:</h3>
               <ul>
