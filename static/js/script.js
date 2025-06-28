@@ -113,21 +113,17 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    if (baNameSearchInput) {
-        baNameSearchInput.addEventListener('input', () => {
-            const filter = baNameSearchInput.value.toLowerCase();
-            Array.from(baNameCheckboxList.children).forEach(label => {
-                label.style.display = label.textContent.toLowerCase().includes(filter) ? '' : 'none';
-            });
-        });
-    }
-    
-    window.addEventListener('click', (event) => {
-        if (baNameDropdown && !baNameSelectContainer.contains(event.target)) {
+    window.addEventListener('click', () => {
+        if (baNameDropdown.classList.contains('show')) {
             baNameDropdown.classList.remove('show');
         }
     });
 
+    if(baNameDropdown) {
+        baNameDropdown.addEventListener('click', (event) => {
+            event.stopPropagation();
+        });
+    }
 
     // --- UI MANAGEMENT ---
     function setDarkMode(isDark) {
@@ -184,8 +180,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (searchButton) { searchButton.addEventListener('click', performSearch); }
     
-    // ... all other functions remain the same ...
-    // The following functions are correct and do not need changes.
     function loadUserManagementPanel() {
         userManagementTableContainer.innerHTML = '<div class="loading-indicator">⏳ Loading users...</div>';
         adminStatusMessage.textContent = '';
@@ -486,7 +480,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- Payout Section ---
     if (payoutForm) {
         const fileInput = document.getElementById('qr_image_input');
         const fileChosenSpan = document.getElementById('file-chosen');
