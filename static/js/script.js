@@ -51,12 +51,16 @@ document.addEventListener('DOMContentLoaded', function() {
         userPermissions = new Set(userInfo.permissions);
         userNameSpan.textContent = userInfo.name;
         userInfoDiv.style.display = 'flex';
+        
         if (isAdmin) {
             adminTabBtn.style.display = 'block';
         }
+        
         if (userPermissions.has('MULTI_SELECT') || userPermissions.has('SEARCH_ALL')) {
             baNameSelectContainer.style.display = 'block';
             baNameInput.style.display = 'none';
+            // This function call is crucial to populate the dropdown
+            populateBaNameDropdown();
         } else {
             baNameSelectContainer.style.display = 'none';
             baNameInput.style.display = 'block';
@@ -70,9 +74,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }).then(userInfo => {
         if (userInfo) {
             setupUIForUser(userInfo);
-            if (userPermissions.has('MULTI_SELECT') || userPermissions.has('SEARCH_ALL')) {
-                populateBaNameDropdown();
-            }
         }
     }).catch(error => console.error("Initialization failed:", error));
     
@@ -106,33 +107,28 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // New, robust dropdown logic
     if (baNameSelectButton) {
         // Move dropdown to the body to avoid overflow issues from parent containers
         document.body.appendChild(baNameDropdown);
 
         baNameSelectButton.addEventListener('click', (event) => {
-            // Stop this click from closing the dropdown immediately
             event.stopPropagation();
             
-            // Calculate position right before showing
             const rect = baNameSelectButton.getBoundingClientRect();
-            baNameDropdown.style.top = `${rect.bottom + window.scrollY + 2}px`; // Position below the button, accounting for scroll
-            baNameDropdown.style.left = `${rect.left + window.scrollX}px`; // Align with the left of the button
-            baNameDropdown.style.width = `${rect.width}px`; // Match the button's width
+            baNameDropdown.style.top = `${rect.bottom + window.scrollY + 2}px`;
+            baNameDropdown.style.left = `${rect.left + window.scrollX}px`;
+            baNameDropdown.style.width = `${rect.width}px`;
 
             baNameDropdown.classList.toggle('show');
         });
     }
 
-    // This listener will close the dropdown if you click anywhere else on the page
     window.addEventListener('click', () => {
         if (baNameDropdown.classList.contains('show')) {
             baNameDropdown.classList.remove('show');
         }
     });
 
-    // This stops clicks *inside* the dropdown from closing it
     if(baNameDropdown) {
         baNameDropdown.addEventListener('click', (event) => {
             event.stopPropagation();
