@@ -153,7 +153,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tabId === 'adminArea' && isAdmin) {
             loadUserManagementPanel();
         }
-        // *** MODIFIED ***: Check for admin OR the 'VIEW_PAYOUTS' permission
         if (tabId === 'payoutArea' && (isAdmin || userPermissions.has('VIEW_PAYOUTS'))) {
             loadPayoutCards();
         }
@@ -187,18 +186,19 @@ document.addEventListener('DOMContentLoaded', function() {
             userManagementTableContainer.innerHTML = `<p class="error-message-main">❌ ${error.message}</p>`;
         });
     }
+
     function buildUserTable(users, allPermissions) {
         userManagementTableContainer.innerHTML = '';
         const table = document.createElement('table'); table.id = 'userManagementTable';
         const thead = document.createElement('thead');
-        let headerRowHtml = '<tr><th>Name</th><th>Email</th>';
+        let headerRowHtml = '<tr><th>Email</th><th>Name</th>'; 
         allPermissions.forEach(perm => { headerRowHtml += `<th>${perm.replace(/_/g, ' ')}</th>`; });
         headerRowHtml += '<th>Action</th></tr>';
         thead.innerHTML = headerRowHtml; table.appendChild(thead);
         const tbody = document.createElement('tbody');
         users.forEach(user => {
             const tr = document.createElement('tr'); tr.dataset.email = user.email;
-            let rowHtml = `<td>${user.name}</td><td>${user.email}</td>`;
+            let rowHtml = `<td>${user.email}</td><td>${user.name}</td>`; 
             const userPerms = new Set(user.permissions);
             allPermissions.forEach(perm => {
                 const isChecked = userPerms.has(perm) ? 'checked' : '';
@@ -375,8 +375,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const thNo = document.createElement('th'); thNo.textContent = 'No.'; headerRow.appendChild(thNo);
             headers.forEach(text => { const th = document.createElement('th'); th.textContent = text.toUpperCase(); headerRow.appendChild(th); });
             thead.appendChild(headerRow); table.appendChild(thead);
+            
             data.resultsTable.forEach((rowData, rowIndex) => {
-                const tr = document.createElement('tr'); tr.dataset.palcode = rowData[0];
+                const tr = document.createElement('tr');
+                
+                // *** MODIFIED ***: Store the composite key parts in the row's dataset
+                tr.dataset.palcode = rowData[0];
+                tr.dataset.month = rowData[1];
+                tr.dataset.week = rowData[2];
+
                 tr.classList.add('result-row-animate'); tr.style.animationDelay = `${rowIndex * 0.05}s`;
                 const tdNo = document.createElement('td'); tdNo.textContent = rowIndex + 1; tr.appendChild(tdNo);
                 headers.forEach((header, cellIndex) => {
@@ -411,15 +418,30 @@ document.addEventListener('DOMContentLoaded', function() {
         saveButton.addEventListener('click', async () => {
             saveButton.disabled = true; saveStatusMessage.textContent = 'Saving...'; saveStatusMessage.className = 'saving';
             const dataToSave = [];
-            document.querySelectorAll('#resultsTableContainer tbody tr').forEach(row => {
+            const tableRows = document.querySelectorAll('#resultsTableContainer tbody tr');
+
+            tableRows.forEach(row => {
                 const statusElement = row.querySelector('[data-field="status"]');
-                dataToSave.push({
-                    palcode: row.dataset.palcode, month: row.querySelector('[data-field="month"]').textContent, week: row.querySelector('[data-field="week"]').textContent, ba_name: row.querySelector('[data-field="ba_name"]').textContent,
-                    reg: row.querySelector('[data-field="reg"]').textContent, valid_fd: row.querySelector('[data-field="valid_fd"]').textContent, suspended_fd: row.querySelector('[data-field="suspended_fd"]').textContent,
-                    rate: row.querySelector('[data-field="rate"]').textContent, ggr_per_fd: row.querySelector('[data-field="ggr_per_fd"]').textContent, total_ggr: row.querySelector('[data-field="total_ggr"]').textContent,
-                    salary: row.querySelector('[data-field="salary"]').textContent, status: statusElement.querySelector('select') ? statusElement.querySelector('select').value : statusElement.textContent
-                });
+                // *** MODIFIED ***: Send the original month and week as part of the payload
+                const rowData = {
+                    palcode: row.dataset.palcode,
+                    original_month: row.dataset.month,
+                    original_week: row.dataset.week,
+                    month: row.querySelector('[data-field="month"]').textContent,
+                    week: row.querySelector('[data-field="week"]').textContent,
+                    ba_name: row.querySelector('[data-field="ba_name"]').textContent,
+                    reg: row.querySelector('[data-field="reg"]').textContent,
+                    valid_fd: row.querySelector('[data-field="valid_fd"]').textContent,
+                    suspended_fd: row.querySelector('[data-field="suspended_fd"]').textContent,
+                    rate: row.querySelector('[data-field="rate"]').textContent,
+                    ggr_per_fd: row.querySelector('[data-field="ggr_per_fd"]').textContent,
+                    total_ggr: row.querySelector('[data-field="total_ggr"]').textContent,
+                    salary: row.querySelector('[data-field="salary"]').textContent,
+                    status: statusElement.querySelector('select') ? statusElement.querySelector('select').value : statusElement.textContent
+                };
+                dataToSave.push(rowData);
             });
+            
             try {
                 const response = await fetch('/api/save_dashboard', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(dataToSave) });
                 if (response.status === 401) { window.location.href = '/login'; return; }
@@ -443,7 +465,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (payoutForm) {
         const fileInput = document.getElementById('qr_image_input');
         const fileChosenSpan = document.getElementById('file-chosen');
-        
         if (fileInput && fileChosenSpan) {
             fileInput.addEventListener('change', function() {
                 if (this.files.length > 0) {
@@ -453,7 +474,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }
-    
         payoutForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             payoutFormStatus.textContent = 'Uploading...'; 
@@ -478,9 +498,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function loadPayoutCards() {
-        // *** MODIFIED ***: Check for admin OR the 'VIEW_PAYOUTS' permission
         if (!payoutInfoCards || (!isAdmin && !userPermissions.has('VIEW_PAYOUTS'))) return;
-
         payoutInfoCards.innerHTML = '<div class="loading-indicator">⏳ Loading submissions...</div>';
         try {
             const res = await fetch('/api/payout/list');
@@ -493,7 +511,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 payoutInfoCards.innerHTML = '<div class="no-payouts-message">No payout submissions yet.</div>';
                 return;
             }
-            
             payoutInfoCards.innerHTML = data.payouts.map(p => `
                 <div class="payout-card">
                     <div><strong>BA NAME:</strong> ${p.ba_name}</div>
@@ -504,7 +521,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     <a href="/uploads/${p.qr_image}" target="_blank" title="View full size QR">
                         <img src="/uploads/${p.qr_image}" alt="QR Code">
                     </a>
-                    ${/* *** MODIFIED ***: Only show delete button to admins */ ''}
                     ${isAdmin ? `<button class="delete-payout-btn" data-payout-id="${p.submitted_at}">Delete</button>` : ''}
                 </div>
             `).join('');

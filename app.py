@@ -26,7 +26,8 @@ ALL_PERMISSIONS = {
     'MULTI_SELECT',
     'SEARCH_ALL',
     'EDIT_TABLE',
-    'VIEW_COMMISSION'
+    'VIEW_COMMISSION',
+    'VIEW_PAYOUTS' 
 }
 YOUR_TIMEZONE = 'Asia/Manila'
 PAYOUT_UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'payout_uploads')
@@ -184,11 +185,14 @@ def get_all_users():
     if not user_data or len(user_data) < 2:
         return jsonify({'users': [], 'all_permissions': list(ALL_PERMISSIONS)})
     users_list = []
+    admin_emails_lower = [email.lower() for email in ADMIN_USER_EMAILS]
     for row in user_data[1:]:
         if len(row) >= 2:
+            user_email = row[1].lower()
             users_list.append({
                 'name': row[0],
-                'email': row[1],
+                'email': user_email,
+                'is_admin': user_email in admin_emails_lower,
                 'permissions': row[3].split(",") if len(row) > 3 and row[3] else []
             })
     return jsonify({"users": users_list, "all_permissions": list(ALL_PERMISSIONS)})
@@ -310,6 +314,7 @@ def search_dashboard_data():
         elif 'SEARCH_ALL' in current_user.permissions: summary_for_display['totalIncentives'] = sum_of_all_individual_incentives
     return jsonify({ "baNameDisplay": ba_display_name, "searchCriteria": search_criteria_frontend, "summary": summary_for_display, "monthDisplay": search_month.upper(), "weekDisplay": search_week.upper(), "dateRangeDisplay": date_range_display, "status": "Active", "resultsTable": results_for_table, "rankedBaList": final_ranked_ba_list, "lastUpdate": last_update_timestamp })
 
+# *** MODIFIED ***: Save logic now uses a composite key to find the exact row, preventing overwrites.
 @app.route('/api/save_dashboard', methods=['POST'])
 @login_required
 def save_dashboard():
@@ -322,7 +327,14 @@ def save_dashboard():
         all_sheet_data = get_sheet_data(DATABASE_SHEET_ID, f"{DATABASE_SHEET_NAME}!A:L")
         if not all_sheet_data:
             return jsonify({"success": False, "error": "Could not fetch current database state."}), 500
-        palcode_map = {row[0]: {'data': row, 'index': i + 1} for i, row in enumerate(all_sheet_data) if row}
+        
+        # Build a map with a composite key for precise lookups
+        row_map = {}
+        for i, row in enumerate(all_sheet_data):
+            if len(row) > 2: # Ensure we have palcode, month, and week
+                key = f"{row[0]}|{row[1]}|{row[2]}" # e.g., "AGT027913|JUNE|WEEK 4"
+                row_map[key] = {'data': row, 'index': i + 1}
+
         update_requests = []
         editable_cols = {
             'month': {'idx': 1, 'col': 'B'}, 'week': {'idx': 2, 'col': 'C'}, 'ba_name': {'idx': 3, 'col': 'D'},
@@ -330,10 +342,16 @@ def save_dashboard():
             'total_ggr': {'idx': 9, 'col': 'J'}, 'status': {'idx': 11, 'col': 'L'}
         }
         for client_row in updated_rows_from_client:
+            # Reconstruct the composite key from the data sent by the client
             palcode = client_row.get('palcode')
-            if palcode in palcode_map:
-                original_row = palcode_map[palcode]['data']
-                original_index = palcode_map[palcode]['index']
+            original_month = client_row.get('original_month')
+            original_week = client_row.get('original_week')
+            
+            key = f"{palcode}|{original_month}|{original_week}"
+
+            if key in row_map:
+                original_row = row_map[key]['data']
+                original_index = row_map[key]['index']
                 for field, col_info in editable_cols.items():
                     col_idx = col_info['idx']
                     original_value = original_row[col_idx] if len(original_row) > col_idx else ""
@@ -343,6 +361,7 @@ def save_dashboard():
                             "range": f"'{DATABASE_SHEET_NAME}'!{col_info['col']}{original_index}",
                             "values": [[client_value]]
                         })
+                        
         if not update_requests:
             return jsonify({"success": True, "message": "No changes detected to save."})
         batch_update_body = { 'valueInputOption': 'USER_ENTERED', 'data': update_requests }
@@ -353,7 +372,6 @@ def save_dashboard():
         logging.error(f"Error saving dashboard data: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-# *** MODIFIED ***: Payout submission now overwrites previous entries by the same user.
 @app.route('/api/payout/submit', methods=['POST'])
 @login_required
 def submit_payout():
@@ -361,27 +379,19 @@ def submit_payout():
     mop_account_name = request.form.get('mop_account_name', '').strip()
     mop_number = request.form.get('mop_number', '').strip()
     qr_file = request.files.get('qr_image')
-
     if not all([ba_name, mop_account_name, mop_number, qr_file]):
         return jsonify({'success': False, 'error': 'All fields are required.'}), 400
-
     payout_info_path = os.path.join(PAYOUT_UPLOAD_FOLDER, 'payout_submissions.json')
     submissions = []
     was_overwritten = False
-    
     try:
-        # Load existing submissions if the file exists
         if os.path.exists(payout_info_path):
             with open(payout_info_path, 'r', encoding='utf-8') as f:
                 submissions = json.load(f)
-        
-        # Check for and remove any existing submission from the current user
         current_user_email = current_user.email
         existing_submission = next((sub for sub in submissions if sub.get('user_email') == current_user_email), None)
-        
         if existing_submission:
             was_overwritten = True
-            # Delete the old QR image file
             old_qr_filename = existing_submission.get('qr_image')
             if old_qr_filename:
                 old_file_path = os.path.join(PAYOUT_UPLOAD_FOLDER, old_qr_filename)
@@ -390,16 +400,10 @@ def submit_payout():
                     logging.info(f"Overwriting: Deleted old QR image {old_file_path}")
                 except FileNotFoundError:
                     logging.warning(f"Old QR image not found during overwrite: {old_file_path}")
-            
-            # Filter out the old submission
             submissions = [sub for sub in submissions if sub.get('user_email') != current_user_email]
-
-        # Save the new QR file
         filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(qr_file.filename)}"
         file_path = os.path.join(PAYOUT_UPLOAD_FOLDER, filename)
         qr_file.save(file_path)
-
-        # Add the new submission
         submissions.append({
             'user_email': current_user_email,
             'ba_name': ba_name,
@@ -408,15 +412,11 @@ def submit_payout():
             'qr_image': filename,
             'submitted_at': datetime.now().isoformat()
         })
-        
-        # Write the updated list back to the file
         with open(payout_info_path, 'w', encoding='utf-8') as f:
             json.dump(submissions, f, indent=2)
-
     except Exception as e:
         logging.error(f"Error during payout submission: {e}")
         return jsonify({'success': False, 'error': 'Failed to save payout info.'}), 500
-    
     message = "Payout info updated successfully. Your previous submission was overwritten." if was_overwritten else "Payout info submitted successfully."
     return jsonify({'success': True, 'message': message})
 
@@ -466,7 +466,7 @@ def delete_payout():
 @app.route('/api/payout/list', methods=['GET'])
 @login_required
 def list_payouts():
-    if not getattr(current_user, 'is_admin', False):
+    if not current_user.is_admin and 'VIEW_PAYOUTS' not in current_user.permissions:
         return jsonify({'success': False, 'error': 'Forbidden'}), 403
     payout_info_path = os.path.join(PAYOUT_UPLOAD_FOLDER, 'payout_submissions.json')
     if not os.path.exists(payout_info_path):
@@ -481,12 +481,13 @@ def list_payouts():
 @app.route('/uploads/<filename>')
 @login_required
 def uploaded_file(filename):
+    if not current_user.is_admin and 'VIEW_PAYOUTS' not in current_user.permissions:
+        return "Forbidden", 403
     return send_from_directory(PAYOUT_UPLOAD_FOLDER, filename)
 
 # Logging Function
 SHEET_ID_CACHE = {}
 def _get_sheet_id_by_name(spreadsheet_id, sheet_name):
-    """Gets the numeric ID of a sheet by its name, using a cache."""
     if spreadsheet_id in SHEET_ID_CACHE and sheet_name in SHEET_ID_CACHE[spreadsheet_id]:
         return SHEET_ID_CACHE[spreadsheet_id][sheet_name]
     try:
