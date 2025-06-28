@@ -1,7 +1,7 @@
 import os
 import json
 from datetime import datetime, timedelta
-from flask import Flask, jsonify, render_template, request, redirect, url_for, session
+from flask import Flask, jsonify, render_template, request, redirect, url_for, session, send_from_directory
 from flask_login import LoginManager, current_user, login_required, login_user, logout_user, UserMixin
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -11,8 +11,6 @@ import requests
 import pytz
 import uuid
 from werkzeug.utils import secure_filename
-from google.cloud import storage
-from google.api_core import exceptions
 
 # --- Basic Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -26,24 +24,19 @@ USERS_SHEET_NAME = 'Users'
 ADMIN_USER_EMAILS = ['harrypobreza@gmail.com'] 
 ALL_PERMISSIONS = {
     'MULTI_SELECT',
+    'SEARCH_ALL',
     'EDIT_TABLE',
-    'VIEW_COMMISSION',
-    'VIEW_PAYOUTS',
-    'SEARCH_ALL'
+    'VIEW_COMMISSION'
 }
 YOUR_TIMEZONE = 'Asia/Manila'
-
-# --- Google Cloud Storage Configuration ---
-# *** CORRECTED ***: Bucket name updated to match your screenshot.
-GCS_BUCKET_NAME = 'payout-uploads'
-GCS_CREDENTIALS_FILE = 'gcs_credentials.json'
-PAYOUT_SUBMISSIONS_FILENAME = 'payout_submissions.json'
+PAYOUT_UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'payout_uploads')
 
 # --- Flask App Initialization ---
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
+os.makedirs(PAYOUT_UPLOAD_FOLDER, exist_ok=True)
 
-# --- User and Login Management ---
+# --- Updated User and Login Management ---
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
@@ -61,31 +54,24 @@ users = {}
 def load_user(user_id):
     return users.get(user_id)
 
-# --- Google API Setup (Sheets & Storage) ---
+# --- Google API Setup ---
+CLIENT_SECRET_FILE = 'client_secret.json'
+SCOPES_OAUTH = ['https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email', 'openid']
+SCOPES_SERVICE_ACCOUNT = ['https://www.googleapis.com/auth/spreadsheets']
 creds_service_account = None
-storage_client = None
 try:
     if 'GOOGLE_CREDENTIALS_JSON' in os.environ:
         creds_json = json.loads(os.environ.get('GOOGLE_CREDENTIALS_JSON'))
-        creds_service_account = service_account.Credentials.from_service_account_info(creds_json, scopes=['https://www.googleapis.com/auth/spreadsheets'])
+        creds_service_account = service_account.Credentials.from_service_account_info(creds_json, scopes=SCOPES_SERVICE_ACCOUNT)
     else:
         KEY_FILE_LOCATION = os.path.join(os.path.dirname(__file__), 'credentials.json')
-        creds_service_account = service_account.Credentials.from_service_account_file(KEY_FILE_LOCATION, scopes=['https://www.googleapis.com/auth/spreadsheets'])
-    
+        creds_service_account = service_account.Credentials.from_service_account_file(KEY_FILE_LOCATION, scopes=SCOPES_SERVICE_ACCOUNT)
     service = build('sheets', 'v4', credentials=creds_service_account)
     sheet_api = service.spreadsheets()
     logging.info("Successfully connected to Google Sheets API.")
-
-    if os.path.exists(GCS_CREDENTIALS_FILE):
-        storage_client = storage.Client.from_service_account_json(GCS_CREDENTIALS_FILE)
-        logging.info("Successfully connected to Google Cloud Storage.")
-    else:
-        logging.warning(f"GCS credentials file ('{GCS_CREDENTIALS_FILE}') not found. Payout functionality will be disabled.")
-
 except Exception as e:
-    logging.error(f"FATAL ERROR: Could not load Google credentials. {e}")
+    logging.error(f"FATAL ERROR: Could not load Google Sheets credentials. {e}")
     sheet_api = None
-    storage_client = None
 
 # --- Helper Functions ---
 def to_float(value):
@@ -142,14 +128,16 @@ def login():
 
 @app.route("/authorize")
 def authorize():
-    flow = Flow.from_client_secrets_file('client_secret.json', scopes=['https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email', 'openid'], redirect_uri=url_for('callback', _external=True))
+    if not os.path.exists(CLIENT_SECRET_FILE):
+        return "Google client secret file missing.", 500
+    flow = Flow.from_client_secrets_file(CLIENT_SECRET_FILE, scopes=SCOPES_OAUTH, redirect_uri=url_for('callback', _external=True))
     authorization_url, state = flow.authorization_url()
     session["state"] = state
     return redirect(authorization_url)
 
 @app.route("/callback")
 def callback():
-    flow = Flow.from_client_secrets_file('client_secret.json', scopes=['https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email', 'openid'], state=session["state"], redirect_uri=url_for('callback', _external=True))
+    flow = Flow.from_client_secrets_file(CLIENT_SECRET_FILE, scopes=SCOPES_OAUTH, state=session["state"], redirect_uri=url_for('callback', _external=True))
     flow.fetch_token(authorization_response=request.url)
     credentials = flow.credentials
     user_info_response = requests.get('https://www.googleapis.com/oauth2/v3/userinfo', headers={'Authorization': f'Bearer {credentials.token}'})
@@ -194,20 +182,16 @@ def get_all_users():
         return jsonify({'error': 'Forbidden'}), 403
     user_data = get_sheet_data(DATABASE_SHEET_ID, f"{USERS_SHEET_NAME}!B:E")
     if not user_data or len(user_data) < 2:
-        return jsonify({'users': [], 'all_permissions': sorted(list(ALL_PERMISSIONS))})
+        return jsonify({'users': [], 'all_permissions': list(ALL_PERMISSIONS)})
     users_list = []
-    admin_emails_lower = [email.lower() for email in ADMIN_USER_EMAILS]
     for row in user_data[1:]:
         if len(row) >= 2:
-            user_email = row[0].lower()
-            user_name = row[1]
             users_list.append({
-                'name': user_name,
-                'email': user_email,
-                'is_admin': user_email in admin_emails_lower,
+                'name': row[0],
+                'email': row[1],
                 'permissions': row[3].split(",") if len(row) > 3 and row[3] else []
             })
-    return jsonify({"users": users_list, "all_permissions": sorted(list(ALL_PERMISSIONS))})
+    return jsonify({"users": users_list, "all_permissions": list(ALL_PERMISSIONS)})
 
 @app.route('/api/update_user_permission', methods=['POST'])
 @login_required
@@ -236,8 +220,22 @@ def update_user_permission():
         return jsonify({'error': 'Cannot change root admin permissions'}), 403
     permissions_string = ",".join(sorted(new_permissions))
     range_to_update = f"{USERS_SHEET_NAME}!E{row_index_to_update}"
-    sheet_api.values().update(spreadsheetId=DATABASE_SHEET_ID, range=range_to_update, valueInputOption='RAW', body={'values': [[permissions_string]]}).execute()
+    sheet_api.values().update(
+        spreadsheetId=DATABASE_SHEET_ID,
+        range=range_to_update,
+        valueInputOption='RAW',
+        body={'values': [[permissions_string]]}
+    ).execute()
     return jsonify({"success": True, "message": f"Permissions for {target_email} updated."})
+
+@app.route('/api/ba-names', methods=['GET'])
+@login_required
+def get_unique_ba_names():
+    data = get_sheet_data(DATABASE_SHEET_ID, f"{DATABASE_SHEET_NAME}!A:L")
+    if not data or len(data) <= 1:
+        return jsonify([])
+    ba_names = set(row[3].strip() for row in data[1:] if len(row) > 3 and row[3])
+    return jsonify(sorted(list(ba_names)))
 
 @app.route('/api/search', methods=['POST'])
 @login_required
@@ -324,11 +322,7 @@ def save_dashboard():
         all_sheet_data = get_sheet_data(DATABASE_SHEET_ID, f"{DATABASE_SHEET_NAME}!A:L")
         if not all_sheet_data:
             return jsonify({"success": False, "error": "Could not fetch current database state."}), 500
-        row_map = {}
-        for i, row in enumerate(all_sheet_data):
-            if len(row) > 2:
-                key = f"{row[0]}|{row[1]}|{row[2]}"
-                row_map[key] = {'data': row, 'index': i + 1}
+        palcode_map = {row[0]: {'data': row, 'index': i + 1} for i, row in enumerate(all_sheet_data) if row}
         update_requests = []
         editable_cols = {
             'month': {'idx': 1, 'col': 'B'}, 'week': {'idx': 2, 'col': 'C'}, 'ba_name': {'idx': 3, 'col': 'D'},
@@ -337,12 +331,9 @@ def save_dashboard():
         }
         for client_row in updated_rows_from_client:
             palcode = client_row.get('palcode')
-            original_month = client_row.get('original_month')
-            original_week = client_row.get('original_week')
-            key = f"{palcode}|{original_month}|{original_week}"
-            if key in row_map:
-                original_row = row_map[key]['data']
-                original_index = row_map[key]['index']
+            if palcode in palcode_map:
+                original_row = palcode_map[palcode]['data']
+                original_index = palcode_map[palcode]['index']
                 for field, col_info in editable_cols.items():
                     col_idx = col_info['idx']
                     original_value = original_row[col_idx] if len(original_row) > col_idx else ""
@@ -362,15 +353,10 @@ def save_dashboard():
         logging.error(f"Error saving dashboard data: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-
-# --- Payout Functions using Google Cloud Storage ---
-
+# *** MODIFIED ***: Payout submission now overwrites previous entries by the same user.
 @app.route('/api/payout/submit', methods=['POST'])
 @login_required
 def submit_payout():
-    if not storage_client:
-        return jsonify({'success': False, 'error': 'Storage service is not configured.'}), 500
-
     ba_name = request.form.get('ba_name', '').strip()
     mop_account_name = request.form.get('mop_account_name', '').strip()
     mop_number = request.form.get('mop_number', '').strip()
@@ -379,55 +365,57 @@ def submit_payout():
     if not all([ba_name, mop_account_name, mop_number, qr_file]):
         return jsonify({'success': False, 'error': 'All fields are required.'}), 400
 
+    payout_info_path = os.path.join(PAYOUT_UPLOAD_FOLDER, 'payout_submissions.json')
+    submissions = []
+    was_overwritten = False
+    
     try:
-        bucket = storage_client.bucket(GCS_BUCKET_NAME)
-        json_blob = bucket.blob(PAYOUT_SUBMISSIONS_FILENAME)
+        # Load existing submissions if the file exists
+        if os.path.exists(payout_info_path):
+            with open(payout_info_path, 'r', encoding='utf-8') as f:
+                submissions = json.load(f)
         
-        submissions = []
-        try:
-            submissions_json = json_blob.download_as_string()
-            submissions = json.loads(submissions_json)
-        except exceptions.NotFound:
-            logging.info(f"{PAYOUT_SUBMISSIONS_FILENAME} not found in bucket. A new file will be created.")
-        
+        # Check for and remove any existing submission from the current user
         current_user_email = current_user.email
-        was_overwritten = False
         existing_submission = next((sub for sub in submissions if sub.get('user_email') == current_user_email), None)
         
         if existing_submission:
             was_overwritten = True
-            old_gcs_path = existing_submission.get('gcs_image_path')
-            if old_gcs_path:
-                old_image_blob = bucket.blob(old_gcs_path)
+            # Delete the old QR image file
+            old_qr_filename = existing_submission.get('qr_image')
+            if old_qr_filename:
+                old_file_path = os.path.join(PAYOUT_UPLOAD_FOLDER, old_qr_filename)
                 try:
-                    old_image_blob.delete()
-                    logging.info(f"Overwriting: Deleted old GCS image {old_gcs_path}")
-                except exceptions.NotFound:
-                    logging.warning(f"Old GCS image not found for deletion during overwrite: {old_gcs_path}")
+                    os.remove(old_file_path)
+                    logging.info(f"Overwriting: Deleted old QR image {old_file_path}")
+                except FileNotFoundError:
+                    logging.warning(f"Old QR image not found during overwrite: {old_file_path}")
             
+            # Filter out the old submission
             submissions = [sub for sub in submissions if sub.get('user_email') != current_user_email]
 
-        filename = f"{uuid.uuid4()}_{secure_filename(qr_file.filename)}"
-        image_blob = bucket.blob(f"qr_images/{filename}")
-        image_blob.upload_from_file(qr_file)
-        image_blob.make_public()
+        # Save the new QR file
+        filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(qr_file.filename)}"
+        file_path = os.path.join(PAYOUT_UPLOAD_FOLDER, filename)
+        qr_file.save(file_path)
 
-        new_submission = {
-            'user_email': current_user.email,
+        # Add the new submission
+        submissions.append({
+            'user_email': current_user_email,
             'ba_name': ba_name,
             'mop_account_name': mop_account_name,
             'mop_number': mop_number,
-            'qr_image': image_blob.public_url,
-            'gcs_image_path': image_blob.name, 
-            'submitted_at': datetime.now(pytz.timezone(YOUR_TIMEZONE)).isoformat()
-        }
-        submissions.append(new_submission)
+            'qr_image': filename,
+            'submitted_at': datetime.now().isoformat()
+        })
         
-        json_blob.upload_from_string(json.dumps(submissions, indent=2), content_type='application/json')
+        # Write the updated list back to the file
+        with open(payout_info_path, 'w', encoding='utf-8') as f:
+            json.dump(submissions, f, indent=2)
 
     except Exception as e:
-        logging.error(f"Error during GCS payout submission: {e}")
-        return jsonify({'success': False, 'error': 'Failed to save payout info to cloud storage.'}), 500
+        logging.error(f"Error during payout submission: {e}")
+        return jsonify({'success': False, 'error': 'Failed to save payout info.'}), 500
     
     message = "Payout info updated successfully. Your previous submission was overwritten." if was_overwritten else "Payout info submitted successfully."
     return jsonify({'success': True, 'message': message})
@@ -437,73 +425,111 @@ def submit_payout():
 def delete_payout():
     if not current_user.is_admin:
         return jsonify({'success': False, 'error': 'Forbidden'}), 403
-    if not storage_client:
-        return jsonify({'success': False, 'error': 'Storage service is not configured.'}), 500
-
     data = request.get_json()
     payout_id = data.get('id')
     if not payout_id:
         return jsonify({'success': False, 'error': 'Payout ID is required.'}), 400
-
+    payout_info_path = os.path.join(PAYOUT_UPLOAD_FOLDER, 'payout_submissions.json')
     try:
-        bucket = storage_client.bucket(GCS_BUCKET_NAME)
-        blob = bucket.blob(PAYOUT_SUBMISSIONS_FILENAME)
-        submissions_json = blob.download_as_string()
-        submissions = json.loads(submissions_json)
-        
-        payout_to_delete = next((p for p in submissions if p.get('submitted_at') == payout_id), None)
-        if not payout_to_delete:
-            return jsonify({'success': False, 'error': 'Payout submission not found.'}), 404
-            
-        gcs_image_path = payout_to_delete.get('gcs_image_path')
-        if gcs_image_path:
-            image_blob = bucket.blob(gcs_image_path)
-            try:
-                image_blob.delete()
-                logging.info(f"Deleted image from GCS: {gcs_image_path}")
-            except exceptions.NotFound:
-                logging.warning(f"Image not found in GCS for deletion: {gcs_image_path}")
-
-        updated_submissions = [p for p in submissions if p.get('submitted_at') != payout_id]
-        blob.upload_from_string(json.dumps(updated_submissions, indent=2), content_type='application/json')
-        
-    except exceptions.NotFound:
-         return jsonify({'success': False, 'error': 'Submissions file not found in cloud storage.'}), 404
+        with open(payout_info_path, 'r', encoding='utf-8') as f:
+            submissions = json.load(f)
+    except FileNotFoundError:
+        return jsonify({'success': False, 'error': 'Submissions file not found.'}), 404
+    except json.JSONDecodeError:
+        return jsonify({'success': False, 'error': 'Could not read submissions file.'}), 500
+    payout_to_delete = None
+    for p in submissions:
+        if p.get('submitted_at') == payout_id:
+            payout_to_delete = p
+            break
+    if not payout_to_delete:
+        return jsonify({'success': False, 'error': 'Payout submission not found.'}), 404
+    qr_filename = payout_to_delete.get('qr_image')
+    if qr_filename:
+        file_path = os.path.join(PAYOUT_UPLOAD_FOLDER, qr_filename)
+        try:
+            os.remove(file_path)
+            logging.info(f"Deleted image file: {file_path}")
+        except FileNotFoundError:
+            logging.warning(f"Image file not found for deletion: {file_path}")
+        except Exception as e:
+            logging.error(f"Error deleting image file {file_path}: {e}")
+    updated_submissions = [p for p in submissions if p.get('submitted_at') != payout_id]
+    try:
+        with open(payout_info_path, 'w', encoding='utf-8') as f:
+            json.dump(updated_submissions, f, indent=2)
     except Exception as e:
-        logging.error(f"Error deleting payout from GCS: {e}")
-        return jsonify({'success': False, 'error': 'Could not delete submission from cloud storage.'}), 500
-
+        logging.error(f"Error writing updated submissions file: {e}")
+        return jsonify({'success': False, 'error': 'Could not update submissions file.'}), 500
     return jsonify({'success': True, 'message': 'Submission deleted successfully.'})
 
 @app.route('/api/payout/list', methods=['GET'])
 @login_required
 def list_payouts():
-    if not current_user.is_admin and 'VIEW_PAYOUTS' not in current_user.permissions:
+    if not getattr(current_user, 'is_admin', False):
         return jsonify({'success': False, 'error': 'Forbidden'}), 403
-    if not storage_client:
-        return jsonify({'success': False, 'error': 'Storage service is not configured.'}), 500
-
-    try:
-        bucket = storage_client.bucket(GCS_BUCKET_NAME)
-        blob = bucket.blob(PAYOUT_SUBMISSIONS_FILENAME)
-        submissions_json = blob.download_as_string()
-        submissions = json.loads(submissions_json)
-        return jsonify({'success': True, 'payouts': submissions})
-    except exceptions.NotFound:
+    payout_info_path = os.path.join(PAYOUT_UPLOAD_FOLDER, 'payout_submissions.json')
+    if not os.path.exists(payout_info_path):
         return jsonify({'success': True, 'payouts': []})
-    except Exception as e:
-        logging.error(f"Error listing payouts from GCS: {e}")
-        return jsonify({'success': False, 'error': 'Could not retrieve payout list.'}), 500
+    try:
+        with open(payout_info_path, 'r', encoding='utf-8') as f:
+            submissions = json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        return jsonify({'success': True, 'payouts': []})
+    return jsonify({'success': True, 'payouts': submissions})
 
-# --- Logging and Main Execution ---
+@app.route('/uploads/<filename>')
+@login_required
+def uploaded_file(filename):
+    return send_from_directory(PAYOUT_UPLOAD_FOLDER, filename)
+
+# Logging Function
+SHEET_ID_CACHE = {}
+def _get_sheet_id_by_name(spreadsheet_id, sheet_name):
+    """Gets the numeric ID of a sheet by its name, using a cache."""
+    if spreadsheet_id in SHEET_ID_CACHE and sheet_name in SHEET_ID_CACHE[spreadsheet_id]:
+        return SHEET_ID_CACHE[spreadsheet_id][sheet_name]
+    try:
+        spreadsheet_metadata = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+        for sheet in spreadsheet_metadata.get('sheets', []):
+            props = sheet.get('properties', {})
+            if props.get('title') == sheet_name:
+                sheet_id = props.get('sheetId')
+                if spreadsheet_id not in SHEET_ID_CACHE:
+                    SHEET_ID_CACHE[spreadsheet_id] = {}
+                SHEET_ID_CACHE[spreadsheet_id][sheet_name] = sheet_id
+                return sheet_id
+        return None
+    except Exception as e:
+        logging.error(f"Could not get sheet ID for '{sheet_name}': {e}")
+        return None
+
 def log_user_event(function_name, inputs):
     if not sheet_api: return
     try:
-        # This function can remain as is
-        pass
+        logs_sheet_id = _get_sheet_id_by_name(LOGS_SHEET_ID, LOGS_SHEET_NAME)
+        if logs_sheet_id is None:
+            logging.error(f"Could not find sheet named '{LOGS_SHEET_NAME}' to log event.")
+            return
+        utc_now = datetime.now(pytz.utc)
+        local_tz = pytz.timezone(YOUR_TIMEZONE)
+        local_now = utc_now.astimezone(local_tz)
+        timestamp = local_now.strftime('%A, %B %d, %Y, %I:%M:%S %p')
+        user_email = current_user.email if current_user.is_authenticated else "Anonymous"
+        if function_name == 'saveDashboardData':
+            formatted_inputs = f"Updated data for {len(inputs.get('updated_palcodes', []))} palcodes."
+        else:
+            ba_names_str = ', '.join(inputs.get('baNames', [])) if inputs.get('baNames') else "N/A"
+            formatted_inputs = f"Month - {inputs.get('month', 'N/A')}, Week - {inputs.get('week', 'N/A').replace('week ', '')}, Ba Name(s) - {ba_names_str}, Palcode - {inputs.get('palcode', 'N/A') or 'N/A'}"
+        new_row_data = [timestamp, user_email, function_name, formatted_inputs]
+        requests_body = [
+            { "insertDimension": { "range": { "sheetId": logs_sheet_id, "dimension": "ROWS", "startIndex": 1, "endIndex": 2 } } },
+            { "updateCells": { "rows": [ { "values": [ {"userEnteredValue": {"stringValue": str(cell)}} for cell in new_row_data ] } ], "fields": "userEnteredValue", "start": { "sheetId": logs_sheet_id, "rowIndex": 1, "columnIndex": 0 } } }
+        ]
+        sheet_api.batchUpdate(spreadsheetId=LOGS_SHEET_ID, body={'requests': requests_body}).execute()
     except Exception as e:
         logging.error(f"Error logging event by inserting row: {e}")
 
 if __name__ == '__main__':
     os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5001)), debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=True)

@@ -2,39 +2,33 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Get all relevant DOM elements ---
     const userInfoDiv = document.getElementById('userInfo');
     const userNameSpan = document.getElementById('userName');
-    
     const homeContentCentered = document.getElementById('homeContentCentered');
+    const homeTitleContainer = document.getElementById('homeTitleContainer');
     const homeSearchControlsContainer = document.getElementById('homeSearchControlsContainer');
     const topLeftDynamicContent = document.getElementById('topLeftDynamicContent');
-    const homeTitleContainer = document.getElementById('homeTitleContainer');
-    
     const searchButton = document.getElementById('searchButton');
     const monthSelect = document.getElementById('monthSelect');
     const weekSelect = document.getElementById('weekSelect');
+    let baNameInput = document.getElementById('baNameInput'); 
     const palcodeInput = document.getElementById('palcodeInput');
     const homeErrorMessage = document.getElementById('homeErrorMessage');
-
-    const baNameInput = document.getElementById('baNameInput'); 
-    const baNameSelectContainer = document.getElementById('baNameSelectContainer');
-    const baNameSelectButton = document.getElementById('baNameSelectButton');
-    const baNameDropdown = document.getElementById('baNameDropdown');
-    const baNameSearchInput = document.getElementById('baNameSearchInput');
-    const baNameCheckboxList = document.getElementById('baNameCheckboxList');
-
     const dashboardTabBtn = document.getElementById('dashboardTabBtn');
     const dashboardPlaceholder = document.getElementById('dashboardPlaceholder');
     const loadingIndicator = document.getElementById('loadingIndicator');
     const dashboardDataDisplay = document.getElementById('dashboardDataDisplay');
     const dashboardSearchError = document.getElementById('dashboardSearchError');
     const darkModeToggleButton = document.getElementById('darkModeToggle');
-    
     const adminTabBtn = document.getElementById('adminTabBtn');
     const userManagementTableContainer = document.getElementById('userManagementTableContainer');
     const adminStatusMessage = document.getElementById('adminStatusMessage');
     const tableControls = document.getElementById('tableControls');
     const saveButton = document.getElementById('saveButton');
     const saveStatusMessage = document.getElementById('saveStatusMessage');
-    
+    const baNameSelectContainer = document.getElementById('baNameSelectContainer');
+    const baNameSelectButton = document.getElementById('baNameSelectButton');
+    const baNameDropdown = document.getElementById('baNameDropdown');
+    const baNameSearchInput = document.getElementById('baNameSearchInput');
+    const baNameCheckboxList = document.getElementById('baNameCheckboxList');
     const payoutForm = document.getElementById('payoutForm');
     const payoutFormStatus = document.getElementById('payoutFormStatus');
     const payoutInfoCards = document.getElementById('payoutInfoCards');
@@ -51,16 +45,12 @@ document.addEventListener('DOMContentLoaded', function() {
         userPermissions = new Set(userInfo.permissions);
         userNameSpan.textContent = userInfo.name;
         userInfoDiv.style.display = 'flex';
-        
         if (isAdmin) {
             adminTabBtn.style.display = 'block';
         }
-        
         if (userPermissions.has('MULTI_SELECT') || userPermissions.has('SEARCH_ALL')) {
             baNameSelectContainer.style.display = 'block';
             baNameInput.style.display = 'none';
-            // This function call is crucial to populate the dropdown
-            populateBaNameDropdown();
         } else {
             baNameSelectContainer.style.display = 'none';
             baNameInput.style.display = 'block';
@@ -74,6 +64,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }).then(userInfo => {
         if (userInfo) {
             setupUIForUser(userInfo);
+            if (userPermissions.has('MULTI_SELECT') || userPermissions.has('SEARCH_ALL')) {
+                populateBaNameDropdown();
+            }
         }
     }).catch(error => console.error("Initialization failed:", error));
     
@@ -108,32 +101,24 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     if (baNameSelectButton) {
-        // Move dropdown to the body to avoid overflow issues from parent containers
-        document.body.appendChild(baNameDropdown);
-
-        baNameSelectButton.addEventListener('click', (event) => {
-            event.stopPropagation();
-            
-            const rect = baNameSelectButton.getBoundingClientRect();
-            baNameDropdown.style.top = `${rect.bottom + window.scrollY + 2}px`;
-            baNameDropdown.style.left = `${rect.left + window.scrollX}px`;
-            baNameDropdown.style.width = `${rect.width}px`;
-
+        baNameSelectButton.addEventListener('click', function(e) {
             baNameDropdown.classList.toggle('show');
+            e.stopPropagation();
         });
     }
-
-    window.addEventListener('click', () => {
-        if (baNameDropdown.classList.contains('show')) {
+    if (baNameSearchInput) {
+        baNameSearchInput.addEventListener('input', function() {
+            const filter = baNameSearchInput.value.toLowerCase();
+            Array.from(baNameCheckboxList.children).forEach(label => {
+                label.style.display = label.textContent.toLowerCase().includes(filter) ? '' : 'none';
+            });
+        });
+    }
+    window.addEventListener('click', function(e) {
+        if (baNameDropdown && !baNameDropdown.contains(e.target) && !baNameSelectButton.contains(e.target)) {
             baNameDropdown.classList.remove('show');
         }
     });
-
-    if(baNameDropdown) {
-        baNameDropdown.addEventListener('click', (event) => {
-            event.stopPropagation();
-        });
-    }
 
     // --- UI MANAGEMENT ---
     function setDarkMode(isDark) {
@@ -168,6 +153,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tabId === 'adminArea' && isAdmin) {
             loadUserManagementPanel();
         }
+        // *** MODIFIED ***: Check for admin OR the 'VIEW_PAYOUTS' permission
         if (tabId === 'payoutArea' && (isAdmin || userPermissions.has('VIEW_PAYOUTS'))) {
             loadPayoutCards();
         }
@@ -190,6 +176,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (searchButton) { searchButton.addEventListener('click', performSearch); }
     
+    // --- Admin Panel Functions ---
     function loadUserManagementPanel() {
         userManagementTableContainer.innerHTML = '<div class="loading-indicator">⏳ Loading users...</div>';
         adminStatusMessage.textContent = '';
@@ -200,31 +187,23 @@ document.addEventListener('DOMContentLoaded', function() {
             userManagementTableContainer.innerHTML = `<p class="error-message-main">❌ ${error.message}</p>`;
         });
     }
-
     function buildUserTable(users, allPermissions) {
         userManagementTableContainer.innerHTML = '';
         const table = document.createElement('table'); table.id = 'userManagementTable';
         const thead = document.createElement('thead');
-        const displayOrder = ['EDIT_TABLE', 'SEARCH_ALL', 'VIEW_COMMISSION', 'VIEW_PAYOUTS', 'MULTI_SELECT'];
-        let headerRowHtml = '<tr><th>Name</th><th>Email</th>'; 
-        displayOrder.forEach(perm => { 
-            if (allPermissions.includes(perm)) {
-                headerRowHtml += `<th>${perm.replace(/_/g, ' ')}</th>`;
-            }
-        });
+        let headerRowHtml = '<tr><th>Name</th><th>Email</th>';
+        allPermissions.forEach(perm => { headerRowHtml += `<th>${perm.replace(/_/g, ' ')}</th>`; });
         headerRowHtml += '<th>Action</th></tr>';
         thead.innerHTML = headerRowHtml; table.appendChild(thead);
         const tbody = document.createElement('tbody');
         users.forEach(user => {
-            const tr = document.createElement('tr');
+            const tr = document.createElement('tr'); tr.dataset.email = user.email;
             let rowHtml = `<td>${user.name}</td><td>${user.email}</td>`;
             const userPerms = new Set(user.permissions);
-            displayOrder.forEach(perm => {
-                 if (allPermissions.includes(perm)) {
-                    const isChecked = userPerms.has(perm) ? 'checked' : '';
-                    const isDisabled = user.is_admin ? 'disabled' : '';
-                    rowHtml += `<td><label class="switch"><input type="checkbox" data-permission="${perm}" ${isChecked} ${isDisabled}><span class="slider round"></span></label></td>`;
-                }
+            allPermissions.forEach(perm => {
+                const isChecked = userPerms.has(perm) ? 'checked' : '';
+                const isDisabled = user.is_admin ? 'disabled' : '';
+                rowHtml += `<td><label class="switch"><input type="checkbox" data-permission="${perm}" ${isChecked} ${isDisabled}><span class="slider round"></span></label></td>`;
             });
             const saveButtonDisabled = user.is_admin ? 'disabled' : '';
             rowHtml += `<td><button class="save-permissions-btn" ${saveButtonDisabled}>Save</button></td>`;
@@ -235,26 +214,17 @@ document.addEventListener('DOMContentLoaded', function() {
             button.addEventListener('click', handlePermissionSave);
         });
     }
-
     function handlePermissionSave(event) {
         const button = event.target;
         const row = button.closest('tr');
-        const email = row.cells[1].textContent; 
-        if (!email) {
-            adminStatusMessage.textContent = `Error: Could not find email for this row.`;
-            adminStatusMessage.className = 'admin-status-message error';
-            return;
-        }
+        const email = row.dataset.email;
         const selectedPermissions = [];
         row.querySelectorAll('input[type="checkbox"]:checked').forEach(checkbox => {
             selectedPermissions.push(checkbox.dataset.permission);
         });
-        button.textContent = 'Saving...'; 
-        button.disabled = true; 
-        adminStatusMessage.textContent = '';
+        button.textContent = 'Saving...'; button.disabled = true; adminStatusMessage.textContent = '';
         fetch('/api/update_user_permission', {
-            method: 'POST', 
-            headers: {'Content-Type': 'application/json'},
+            method: 'POST', headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ email: email, permissions: selectedPermissions })
         }).then(res => res.json()).then(data => {
             if (data.success) {
@@ -266,14 +236,12 @@ document.addEventListener('DOMContentLoaded', function() {
             adminStatusMessage.className = 'admin-status-message error';
         }).finally(() => {
             button.textContent = 'Save';
-            const firstCheckbox = row.querySelector('input[type=checkbox]');
-            if (!firstCheckbox || !firstCheckbox.disabled) {
-                button.disabled = false;
-            }
+            if (!row.querySelector('input[type=checkbox]').disabled) { button.disabled = false; }
             setTimeout(() => { adminStatusMessage.textContent = ''; adminStatusMessage.className = 'admin-status-message'; }, 5000);
         });
     }
 
+    // --- Search & Data Handling ---
     function performSearch() {
         const month = monthSelect.value, week = weekSelect.value, palcode = palcodeInput.value.trim();
         let baNamesToSearch = [];
@@ -407,13 +375,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const thNo = document.createElement('th'); thNo.textContent = 'No.'; headerRow.appendChild(thNo);
             headers.forEach(text => { const th = document.createElement('th'); th.textContent = text.toUpperCase(); headerRow.appendChild(th); });
             thead.appendChild(headerRow); table.appendChild(thead);
-            
             data.resultsTable.forEach((rowData, rowIndex) => {
-                const tr = document.createElement('tr');
-                tr.dataset.palcode = rowData[0];
-                tr.dataset.month = rowData[1];
-                tr.dataset.week = rowData[2];
-
+                const tr = document.createElement('tr'); tr.dataset.palcode = rowData[0];
                 tr.classList.add('result-row-animate'); tr.style.animationDelay = `${rowIndex * 0.05}s`;
                 const tdNo = document.createElement('td'); tdNo.textContent = rowIndex + 1; tr.appendChild(tdNo);
                 headers.forEach((header, cellIndex) => {
@@ -448,29 +411,15 @@ document.addEventListener('DOMContentLoaded', function() {
         saveButton.addEventListener('click', async () => {
             saveButton.disabled = true; saveStatusMessage.textContent = 'Saving...'; saveStatusMessage.className = 'saving';
             const dataToSave = [];
-            const tableRows = document.querySelectorAll('#resultsTableContainer tbody tr');
-
-            tableRows.forEach(row => {
+            document.querySelectorAll('#resultsTableContainer tbody tr').forEach(row => {
                 const statusElement = row.querySelector('[data-field="status"]');
-                const rowData = {
-                    palcode: row.dataset.palcode,
-                    original_month: row.dataset.month,
-                    original_week: row.dataset.week,
-                    month: row.querySelector('[data-field="month"]').textContent,
-                    week: row.querySelector('[data-field="week"]').textContent,
-                    ba_name: row.querySelector('[data-field="ba_name"]').textContent,
-                    reg: row.querySelector('[data-field="reg"]').textContent,
-                    valid_fd: row.querySelector('[data-field="valid_fd"]').textContent,
-                    suspended_fd: row.querySelector('[data-field="suspended_fd"]').textContent,
-                    rate: row.querySelector('[data-field="rate"]').textContent,
-                    ggr_per_fd: row.querySelector('[data-field="ggr_per_fd"]').textContent,
-                    total_ggr: row.querySelector('[data-field="total_ggr"]').textContent,
-                    salary: row.querySelector('[data-field="salary"]').textContent,
-                    status: statusElement.querySelector('select') ? statusElement.querySelector('select').value : statusElement.textContent
-                };
-                dataToSave.push(rowData);
+                dataToSave.push({
+                    palcode: row.dataset.palcode, month: row.querySelector('[data-field="month"]').textContent, week: row.querySelector('[data-field="week"]').textContent, ba_name: row.querySelector('[data-field="ba_name"]').textContent,
+                    reg: row.querySelector('[data-field="reg"]').textContent, valid_fd: row.querySelector('[data-field="valid_fd"]').textContent, suspended_fd: row.querySelector('[data-field="suspended_fd"]').textContent,
+                    rate: row.querySelector('[data-field="rate"]').textContent, ggr_per_fd: row.querySelector('[data-field="ggr_per_fd"]').textContent, total_ggr: row.querySelector('[data-field="total_ggr"]').textContent,
+                    salary: row.querySelector('[data-field="salary"]').textContent, status: statusElement.querySelector('select') ? statusElement.querySelector('select').value : statusElement.textContent
+                });
             });
-            
             try {
                 const response = await fetch('/api/save_dashboard', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(dataToSave) });
                 if (response.status === 401) { window.location.href = '/login'; return; }
@@ -490,9 +439,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // --- Payout Section ---
     if (payoutForm) {
         const fileInput = document.getElementById('qr_image_input');
         const fileChosenSpan = document.getElementById('file-chosen');
+        
         if (fileInput && fileChosenSpan) {
             fileInput.addEventListener('change', function() {
                 if (this.files.length > 0) {
@@ -502,6 +453,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }
+    
         payoutForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             payoutFormStatus.textContent = 'Uploading...'; 
@@ -526,7 +478,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function loadPayoutCards() {
+        // *** MODIFIED ***: Check for admin OR the 'VIEW_PAYOUTS' permission
         if (!payoutInfoCards || (!isAdmin && !userPermissions.has('VIEW_PAYOUTS'))) return;
+
         payoutInfoCards.innerHTML = '<div class="loading-indicator">⏳ Loading submissions...</div>';
         try {
             const res = await fetch('/api/payout/list');
@@ -539,6 +493,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 payoutInfoCards.innerHTML = '<div class="no-payouts-message">No payout submissions yet.</div>';
                 return;
             }
+            
             payoutInfoCards.innerHTML = data.payouts.map(p => `
                 <div class="payout-card">
                     <div><strong>BA NAME:</strong> ${p.ba_name}</div>
@@ -546,9 +501,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div><strong>MOP NUMBER:</strong> ${p.mop_number}</div>
                     <div><strong>Submitted by:</strong> ${p.user_email}</div>
                     <div><strong>Date:</strong> ${new Date(p.submitted_at).toLocaleString()}</div>
-                    <a href="${p.qr_image}" target="_blank" title="View full size QR">
-                        <img src="${p.qr_image}" alt="QR Code">
+                    <a href="/uploads/${p.qr_image}" target="_blank" title="View full size QR">
+                        <img src="/uploads/${p.qr_image}" alt="QR Code">
                     </a>
+                    ${/* *** MODIFIED ***: Only show delete button to admins */ ''}
                     ${isAdmin ? `<button class="delete-payout-btn" data-payout-id="${p.submitted_at}">Delete</button>` : ''}
                 </div>
             `).join('');
