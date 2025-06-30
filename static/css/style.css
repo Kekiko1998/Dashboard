@@ -122,11 +122,39 @@ html, body {
 #dashboardDataDisplay .left-panel .ba-ranking-list::-webkit-scrollbar-track { background-color: var(--scrollbar-track-bg); border-radius: 10px; }
 #dashboardDataDisplay .left-panel .ba-ranking-list::-webkit-scrollbar-thumb { background-color: var(--scrollbar-thumb-bg); border-radius: 10px; border: 2px solid var(--scrollbar-track-bg); }
 #dashboardDataDisplay .left-panel .ba-ranking-list::-webkit-scrollbar-thumb:hover { background-color: var(--scrollbar-thumb-hover-bg); }
-#dashboardDataDisplay .left-panel .ba-ranking-list .ba-rank-item { display: flex; justify-content: space-between; align-items: center; padding: 4px 2px; font-family: var(--roboto-font); font-size: 0.85em; color: var(--text-color-main); border-bottom: 1px dashed var(--input-border-color); }
+#dashboardDataDisplay .left-panel .ba-ranking-list .ba-rank-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 2px;
+  font-family: var(--roboto-font);
+  font-size: 0.85em;
+  color: #ffe066; /* brighter yellow */
+  border-bottom: 1px dashed var(--input-border-color);
+}
 #dashboardDataDisplay .left-panel .ba-ranking-list .ba-rank-item:last-child { border-bottom: none; }
-#dashboardDataDisplay .left-panel .ba-ranking-list .ba-rank-item .rank-number { font-weight: bold; margin-right: 8px; color: var(--primary-blue); min-width: 20px; text-align: right; }
-#dashboardDataDisplay .left-panel .ba-ranking-list .ba-rank-item .ba-name { flex-grow: 1; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 8px; }
-#dashboardDataDisplay .left-panel .ba-ranking-list .ba-rank-item .ba-fd-count { font-weight: bold; font-family: var(--bebas-font); font-size: 1.1em; color: var(--primary-blue); }
+#dashboardDataDisplay .left-panel .ba-ranking-list .ba-rank-item .rank-number {
+  font-weight: bold;
+  margin-right: 8px;
+  color: #ffd700; /* gold */
+  min-width: 20px;
+  text-align: right;
+}
+#dashboardDataDisplay .left-panel .ba-ranking-list .ba-rank-item .ba-name {
+  flex-grow: 1;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-right: 8px;
+  color: #fffbe6; /* very bright off-white */
+}
+#dashboardDataDisplay .left-panel .ba-ranking-list .ba-rank-item .ba-fd-count {
+  font-weight: bold;
+  font-family: var(--bebas-font);
+  font-size: 1.1em;
+  color: #7cf6ff; /* bright cyan */
+}
 #dashboardDataDisplay .right-panel { flex-grow: 1; background-color: var(--panel-bg); padding: 20px; border-radius: 4px; display: flex; flex-direction: column; box-shadow: 0 1px 3px rgba(0,0,0,0.1); min-width: 0; }
 .results-table-container { flex-grow: 1; overflow-x: auto; overflow-y: auto; scrollbar-width: var(--scrollbar-width-firefox); scrollbar-color: var(--scrollbar-thumb-bg) var(--scrollbar-track-bg); }
 .results-table-container::-webkit-scrollbar { width: var(--scrollbar-width-webkit); height: var(--scrollbar-width-webkit); background-color: var(--scrollbar-track-bg); }
