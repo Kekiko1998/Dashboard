@@ -141,19 +141,20 @@ html, body {
   text-align: right;
 }
 #dashboardDataDisplay .left-panel .ba-ranking-list .ba-rank-item .ba-name {
-  flex-grow: 1;
+  flex-grow: 2;
+  font-family: var(--bebas-font);
   text-align: left;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   margin-right: 8px;
-  color: #fffbe6; /* very bright off-white */
+  color: #ffffff; /* very bright off-white */
 }
 #dashboardDataDisplay .left-panel .ba-ranking-list .ba-rank-item .ba-fd-count {
   font-weight: bold;
   font-family: var(--bebas-font);
   font-size: 1.1em;
-  color: #7cf6ff; /* bright cyan */
+  color: #ffffff; /* bright cyan */
 }
 #dashboardDataDisplay .right-panel { flex-grow: 1; background-color: var(--panel-bg); padding: 20px; border-radius: 4px; display: flex; flex-direction: column; box-shadow: 0 1px 3px rgba(0,0,0,0.1); min-width: 0; }
 .results-table-container { flex-grow: 1; overflow-x: auto; overflow-y: auto; scrollbar-width: var(--scrollbar-width-firefox); scrollbar-color: var(--scrollbar-thumb-bg) var(--scrollbar-track-bg); }
@@ -193,17 +194,17 @@ html, body {
 .salary-notes li strong { font-weight: bold; }
 .loading-indicator { text-align:center; padding:30px; font-size:1.2em; color:var(--text-color-main); font-weight:bold; width:100%; flex-grow:1; display:flex; align-items:center; justify-content:center;}
 #globalErrorMessage { display: none; color:var(--error-color); font-weight:bold;}
-.status-paid { color: #adb5bd !important; }
-.status-on-going { color: #868e96 !important; }
-.status-delayed { color: #495057 !important; }
-.status-updating { color: #6c757d !important; }
-.status-invalid { color: #dee2e6 !important; }
+.status-paid { color: #045729 !important; }
+.status-on-going { color: #0579a7 !important; }
+.status-delayed { color: #ffa806 !important; }
+.status-updating { color: #00f7ff !important; }
+.status-invalid { color: #c42e01 !important; }
 .status-unofficial { color: #adb5bd !important; font-style: italic;}
 .status-display span[id="statusValue"], .results-table-container td[class*="status-"] { font-family: var(--lexend-font); font-weight: 500; }
-body.light-mode .status-paid { color: #adb5bd !important; }
-body.light-mode .status-on-going { color: #868e96 !important; }
-body.light-mode .status-updating { color: #495057 !important; }
-body.light-mode .status-invalid { color: #adb5bd !important; }
+body.light-mode .status-paid { color: #047504 !important; }
+body.light-mode .status-on-going { color: #054c94 !important; }
+body.light-mode .status-updating { color: #00f7ff !important; }
+body.light-mode .status-invalid { color: #c42e01 !important; }
 body.light-mode .status-unofficial { color: #adb5bd !important; }
 @keyframes rippleRowIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 .result-row-animate { opacity: 0; animation: rippleRowIn 0.4s ease-out forwards; }
@@ -610,88 +611,103 @@ select option {
 .ba-dropdown {
   box-shadow: 0 4px 24px 0 rgba(0,0,0,0.18), 0 1px 4px 0 rgba(0,0,0,0.04) inset;
 }
-/* Optional: Style the dropdown arrow for glass look */
-select {
-  /* Remove default arrow in Chrome */
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23888888%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E');
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  background-size: .7em auto;
+
+/* Burger menu button */
+.burger-menu-btn {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 38px;
+  height: 38px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  z-index: 1201;
+  margin-right: 10px;
+}
+.burger-bar {
+  width: 26px;
+  height: 3px;
+  background: var(--text-color-main);
+  margin: 3px 0;
+  border-radius: 2px;
+  transition: all 0.3s;
 }
 
-/* For Firefox: style the dropdown popup (limited support) */
-select:-moz-focusring {
-  color: var(--input-text);
-  text-shadow: 0 1px 0 #fff;
+/* Show burger menu on small screens */
+@media (max-width: 900px) {
+  .burger-menu-btn {
+    display: flex;
+  }
+  .tabs {
+    display: none !important;
+  }
 }
 
-/* Optional: Style the open dropdown list (Webkit only, limited support) */
-select:focus {
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(0,123,255,0.18);
+/* Foldout mobile menu styles */
+.mobile-menu-overlay {
+  display: none;
+  position: fixed;
+  z-index: 1200;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.28);
+  transition: opacity 0.2s;
 }
 
-/* Remove background from option for glass effect (works in some browsers) */
-select option {
-  background: rgba(40, 40, 40, 0.85);
-  color: var(--input-text);
-  /* For light mode */
+.mobile-tabs-menu {
+  display: block;
+  position: fixed;
+  top: 0;
+  left: -260px;
+  width: 240px;
+  height: 100vh;
+  background: rgba(24, 26, 27, 0.95);
+  box-shadow: 2px 0 16px 0 rgba(0,0,0,0.18);
+  z-index: 1202;
+  padding: 32px 0 0 0;
+  transition: left 0.25s cubic-bezier(.4,0,.2,1);
+  border-radius: 0 18px 18px 0;
+  overflow-y: auto;
 }
-body.light-mode select option {
-  background: rgba(255,255,255,0.85);
-  color: var(--input-text);
+.mobile-tabs-menu.open {
+  left: 0;
 }
-
-/* --- Glassmorphism for BA Dropdown and Search Input --- */
-.ba-dropdown,
-#baNameSearchInput {
-  background: rgba(24,26,27,0.35) !important;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255,255,255,0.13);
-  border-radius: 12px;
-  box-shadow: 0 4px 24px 0 rgba(0,0,0,0.18);
-  color: var(--input-text);
-  transition: background 0.2s, border-color 0.2s;
+.mobile-menu-overlay.open {
+  display: block;
+  opacity: 1;
 }
-
-body.light-mode .ba-dropdown,
-body.light-mode #baNameSearchInput {
-  background: rgba(255,255,255,0.35) !important;
-  border: 1px solid rgba(0,0,0,0.10);
-  color: var(--input-text);
-}
-
-/* Remove background from labels inside dropdown for glass look */
-#baNameCheckboxList label {
+.mobile-tabs-menu .tab-button {
+  display: block;
+  width: 90%;
+  margin: 0 auto 10px auto;
+  font-size: 1.2em;
+  text-align: left;
   background: transparent !important;
-  transition: background 0.18s;
+  border: none;
+  border-radius: 6px;
+  color: var(--tab-inactive-text);
+  padding: 12px 18px;
+  transition: background 0.18s, color 0.18s;
 }
-#baNameCheckboxList label:hover {
-  background: rgba(35,39,43,0.45) !important;
-  color: #fff;
-}
-
-/* Remove background from dropdown container if set elsewhere */
-.ba-name-select-wrapper {
-  background: none !important;
-}
-
-/* Optional: Remove box-shadow from input for a cleaner glass look */
-#baNameSearchInput {
-  box-shadow: none !important;
+.mobile-tabs-menu .tab-button.active,
+.mobile-tabs-menu .tab-button:hover {
+  background: rgba(35, 39, 43, 0.25) !important;
+  color: var(--tab-active-text);
 }
 
-/* Optional: Make the dropdown border more subtle */
-.ba-dropdown {
-  border-width: 1.5px;
+/* Hide .tabs and show burger menu when search controls are in top navigation */
+.top-left-dynamic-content > .home-search-controls-container ~ .tabs-and-toggle-container .tabs {
+  display: none !important;
+}
+.top-left-dynamic-content > .home-search-controls-container ~ .tabs-and-toggle-container .burger-menu-btn {
+  display: flex !important;
 }
 
-/* Optional: Add a subtle inner shadow for depth */
-.ba-dropdown {
-  box-shadow: 0 4px 24px 0 rgba(0,0,0,0.18), 0 1px 4px 0 rgba(0,0,0,0.04) inset;
+/* Hide mobile menu on large screens */
+@media (min-width: 901px) {
+  .mobile-tabs-menu, .mobile-menu-overlay {
+    display: none !important;
+  }
 }
 

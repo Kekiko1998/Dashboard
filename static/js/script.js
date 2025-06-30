@@ -32,6 +32,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const payoutFormStatus = document.getElementById('payoutFormStatus');
     const payoutInfoCards = document.getElementById('payoutInfoCards');
     const payoutTabBtn = document.getElementById('payoutTabBtn');
+    const burgerMenuBtn = document.getElementById('burgerMenuBtn');
+    const mobileTabsMenu = document.getElementById('mobileTabsMenu');
+    const mainTabs = document.getElementById('mainTabs');
+    const mobileMenuOverlay = document.getElementById('mobileMenuOverlay');
 
     // --- State Variables ---
     let isAdmin = false;
@@ -63,6 +67,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }).then(userInfo => {
         if (userInfo) {
             setupUIForUser(userInfo);
+            syncAdminTabVisibility(); // <-- Add this line to immediately sync admin tab visibility
             if (userPermissions.has('MULTI_SELECT') || userPermissions.has('SEARCH_ALL')) {
                 populateBaNameDropdown();
             }
@@ -551,4 +556,72 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         window.requestAnimationFrame(step);
     }
+
+    // --- Burger menu logic ---
+    function closeMobileMenu() {
+        mobileTabsMenu.classList.remove('open');
+        mobileMenuOverlay.classList.remove('open');
+    }
+    function openMobileMenu() {
+        mobileTabsMenu.classList.add('open');
+        mobileMenuOverlay.classList.add('open');
+    }
+    if (burgerMenuBtn && mobileTabsMenu && mobileMenuOverlay) {
+        burgerMenuBtn.addEventListener('click', function(e) {
+            if (mobileTabsMenu.classList.contains('open')) {
+                closeMobileMenu();
+            } else {
+                openMobileMenu();
+            }
+            e.stopPropagation();
+        });
+        mobileMenuOverlay.addEventListener('click', closeMobileMenu);
+        // Hide menu on tab click
+        Array.from(mobileTabsMenu.querySelectorAll('.tab-button')).forEach(btn => {
+            btn.addEventListener('click', closeMobileMenu);
+        });
+    }
+
+    // Sync admin tab visibility for mobile
+    function syncAdminTabVisibility() {
+        const adminTabBtn = document.getElementById('adminTabBtn');
+        const mobileAdminTabBtn = document.getElementById('mobileAdminTabBtn');
+        if (adminTabBtn && mobileAdminTabBtn) {
+            mobileAdminTabBtn.style.display = adminTabBtn.style.display;
+        }
+    }
+
+    // Sync active tab between desktop and mobile
+    function syncActiveTab(tabId) {
+        const tabMap = {
+            'homeArea': ['homeTabBtn', 'mobileHomeTabBtn'],
+            'dashboardDisplayArea': ['dashboardTabBtn', 'mobileDashboardTabBtn'],
+            'salarySchemeArea': ['salaryTabBtn', 'mobileSalaryTabBtn'],
+            'adminArea': ['adminTabBtn', 'mobileAdminTabBtn'],
+            'payoutArea': ['payoutTabBtn', 'mobilePayoutTabBtn']
+        };
+        Object.values(tabMap).forEach(([desktopId, mobileId]) => {
+            const dBtn = document.getElementById(desktopId);
+            const mBtn = document.getElementById(mobileId);
+            if (dBtn) dBtn.classList.remove('active');
+            if (mBtn) mBtn.classList.remove('active');
+        });
+        const ids = tabMap[tabId];
+        if (ids) {
+            const dBtn = document.getElementById(ids[0]);
+            const mBtn = document.getElementById(ids[1]);
+            if (dBtn) dBtn.classList.add('active');
+            if (mBtn) mBtn.classList.add('active');
+        }
+    }
+
+    // Patch showTab to sync active state
+    const origShowTab = window.showTab;
+    window.showTab = function(tabId, clickedButton) {
+        origShowTab(tabId, clickedButton);
+        syncActiveTab(tabId);
+        syncAdminTabVisibility();
+    };
+    // Initial sync for admin tab
+    syncAdminTabVisibility();
 });
