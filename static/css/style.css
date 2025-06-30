@@ -22,19 +22,19 @@ body {
   --top-nav-bg: transparent; /* REMOVE solid color */
   --panel-bg: transparent;   /* REMOVE solid color */
   --card-bg-summary: transparent; /* REMOVE solid color */
-  --card-text-color-summary: #e0e0e0;
+  --card-text-color-summary: #fff; /* was #e0e0e0 */
   --card-value-color-summary: #fff;
   --input-bg: #23272b;
   --input-text: #e0e0e0;
   --input-border-color: #343a40;
   --input-placeholder-color: #868e96;
-  --text-color-main: #e0e0e0;
-  --text-color-subtle: #868e96;
-  --text-color-panel-heading: #f8f9fa;
+  --text-color-main: #fff; /* was #e0e0e0 */
+  --text-color-subtle: #e0e0e0; /* was #868e96 */
+  --text-color-panel-heading: #fff; /* was #f8f9fa */
   --table-header-bg: #23272b;
-  --table-header-text: #e0e0e0;
+  --table-header-text: #fff; /* was #e0e0e0 */
   --table-cell-bg: #181a1b;
-  --table-cell-text: #e0e0e0;
+  --table-cell-text: #fff; /* was #e0e0e0 */
   --table-stripe-bg: #23272b;
   --table-hover-bg: #343a40;
   --table-border-color: #343a40;
@@ -42,8 +42,8 @@ body {
   --tab-inactive-text: #868e96;
   --tab-active-bg: #16181a;
   --tab-active-text: #fff;
-  --error-color: #868e96;
-  --error-color-darker: #495057;
+  --error-color: #ffb347; /* brighter orange for errors */
+  --error-color-darker: #ff8800;
 }
 
 /* --- Base and Layout Styles --- */
