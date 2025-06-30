@@ -26,7 +26,8 @@ ALL_PERMISSIONS = {
     'MULTI_SELECT',
     'SEARCH_ALL',
     'EDIT_TABLE',
-    'VIEW_COMMISSION'
+    'VIEW_COMMISSION',
+    'VIEW_PAYOUTS'  # <-- Add this line
 }
 YOUR_TIMEZONE = 'Asia/Manila'
 PAYOUT_UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'payout_uploads')
@@ -180,16 +181,16 @@ def get_user_info():
 def get_all_users():
     if not current_user.is_admin:
         return jsonify({'error': 'Forbidden'}), 403
-    user_data = get_sheet_data(DATABASE_SHEET_ID, f"{USERS_SHEET_NAME}!B:E")
+    user_data = get_sheet_data(DATABASE_SHEET_ID, f"{USERS_SHEET_NAME}!A:E")
     if not user_data or len(user_data) < 2:
         return jsonify({'users': [], 'all_permissions': list(ALL_PERMISSIONS)})
     users_list = []
     for row in user_data[1:]:
-        if len(row) >= 2:
+        if len(row) >= 3:
             users_list.append({
-                'name': row[0],
-                'email': row[1],
-                'permissions': row[3].split(",") if len(row) > 3 and row[3] else []
+                'name': row[2],  # NAME is column 2
+                'email': row[1], # EMAIL is column 1
+                'permissions': row[4].split(",") if len(row) > 4 and row[4] else []
             })
     return jsonify({"users": users_list, "all_permissions": list(ALL_PERMISSIONS)})
 
@@ -322,7 +323,8 @@ def save_dashboard():
         all_sheet_data = get_sheet_data(DATABASE_SHEET_ID, f"{DATABASE_SHEET_NAME}!A:L")
         if not all_sheet_data:
             return jsonify({"success": False, "error": "Could not fetch current database state."}), 500
-        palcode_map = {row[0]: {'data': row, 'index': i + 1} for i, row in enumerate(all_sheet_data) if row}
+
+        # Build a list of all rows for matching
         update_requests = []
         editable_cols = {
             'month': {'idx': 1, 'col': 'B'}, 'week': {'idx': 2, 'col': 'C'}, 'ba_name': {'idx': 3, 'col': 'D'},
@@ -330,10 +332,25 @@ def save_dashboard():
             'total_ggr': {'idx': 9, 'col': 'J'}, 'status': {'idx': 11, 'col': 'L'}
         }
         for client_row in updated_rows_from_client:
-            palcode = client_row.get('palcode')
-            if palcode in palcode_map:
-                original_row = palcode_map[palcode]['data']
-                original_index = palcode_map[palcode]['index']
+            palcode = client_row.get('palcode', '').strip()
+            month = client_row.get('month', '').strip()
+            week = client_row.get('week', '').strip()
+            ba_name = client_row.get('ba_name', '').strip()
+            # Find the exact row matching all four fields
+            original_index = None
+            original_row = None
+            for i, row in enumerate(all_sheet_data):
+                if (
+                    len(row) > 3 and
+                    str(row[0]).strip() == palcode and
+                    str(row[1]).strip() == month and
+                    str(row[2]).strip() == week and
+                    str(row[3]).strip() == ba_name
+                ):
+                    original_row = row
+                    original_index = i + 1  # 1-based for Google Sheets
+                    break
+            if original_row and original_index:
                 for field, col_info in editable_cols.items():
                     col_idx = col_info['idx']
                     original_value = original_row[col_idx] if len(original_row) > col_idx else ""
@@ -466,8 +483,6 @@ def delete_payout():
 @app.route('/api/payout/list', methods=['GET'])
 @login_required
 def list_payouts():
-    if not getattr(current_user, 'is_admin', False):
-        return jsonify({'success': False, 'error': 'Forbidden'}), 403
     payout_info_path = os.path.join(PAYOUT_UPLOAD_FOLDER, 'payout_submissions.json')
     if not os.path.exists(payout_info_path):
         return jsonify({'success': True, 'payouts': []})
@@ -476,7 +491,14 @@ def list_payouts():
             submissions = json.load(f)
     except (json.JSONDecodeError, FileNotFoundError):
         return jsonify({'success': True, 'payouts': []})
-    return jsonify({'success': True, 'payouts': submissions})
+
+    # Admins and VIEW_PAYOUTS see all, others see only their own
+    if getattr(current_user, 'is_admin', False) or 'VIEW_PAYOUTS' in getattr(current_user, 'permissions', []):
+        visible_submissions = submissions
+    else:
+        visible_submissions = [s for s in submissions if s.get('user_email', '').lower() == current_user.email.lower()]
+
+    return jsonify({'success': True, 'payouts': visible_submissions})
 
 @app.route('/uploads/<filename>')
 @login_required
@@ -529,6 +551,13 @@ def log_user_event(function_name, inputs):
         sheet_api.batchUpdate(spreadsheetId=LOGS_SHEET_ID, body={'requests': requests_body}).execute()
     except Exception as e:
         logging.error(f"Error logging event by inserting row: {e}")
+
+def find_user_row(users_sheet, email):
+    email = email.strip().lower()
+    for idx, row in enumerate(users_sheet):
+        if len(row) > 1 and row[1].strip().lower() == email:
+            return idx
+    return -1
 
 if __name__ == '__main__':
     os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'

@@ -197,7 +197,7 @@
               </div>
               
               <button type="submit" class="payout-submit-btn">UPLOAD INFORMATION</button>
-       git log --oneline       <span id="payoutFormStatus"></span>
+              <span id="payoutFormStatus"></span>
             </form>
           </div>
           <div id="payoutInfoCards"></div>
@@ -206,6 +206,32 @@
   </div>
   <div id="globalErrorMessage" class="error-message-main" style="padding: 10px; text-align: center; display:none;"></div>
 
-  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+  <!-- Animated background container -->
+<div id="vanta-bg" style="position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:-1;"></div>
+
+<!-- Vanta.js and Three.js scripts -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.clouds.min.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    VANTA.CLOUDS({
+      el: "#vanta-bg",
+      mouseControls: true,
+      touchControls: true,
+      minHeight: 200.00,
+      minWidth: 200.00,
+      skyColor: 0x3fb5e3,
+      cloudColor: 0xadc1de,
+      cloudShadowColor: 0x183550,
+      sunColor: 0xff9919,
+      sunGlareColor: 0xff6633,
+      sunlightColor: 0xff9933,
+      speed: 1
+    });
+  });
+</script>
+
+<!-- Scripts at the end -->
+<script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>

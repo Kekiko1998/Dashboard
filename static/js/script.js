@@ -465,9 +465,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     payoutFormStatus.textContent = data.message;
                     payoutForm.reset();
                     if (fileChosenSpan) fileChosenSpan.textContent = 'No file chosen';
-                    if (isAdmin || userPermissions.has('VIEW_PAYOUTS')) {
-                        setTimeout(loadPayoutCards, 1000);
-                    }
+                    setTimeout(loadPayoutCards, 1000); // <-- Always call this
                 } else {
                     payoutFormStatus.textContent = `Error: ${data.error || 'Submission failed.'}`;
                 }
@@ -478,8 +476,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function loadPayoutCards() {
-        // *** MODIFIED ***: Check for admin OR the 'VIEW_PAYOUTS' permission
-        if (!payoutInfoCards || (!isAdmin && !userPermissions.has('VIEW_PAYOUTS'))) return;
+        if (!payoutInfoCards) return; // Remove the permission check here
 
         payoutInfoCards.innerHTML = '<div class="loading-indicator">⏳ Loading submissions...</div>';
         try {
@@ -504,7 +501,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     <a href="/uploads/${p.qr_image}" target="_blank" title="View full size QR">
                         <img src="/uploads/${p.qr_image}" alt="QR Code">
                     </a>
-                    ${/* *** MODIFIED ***: Only show delete button to admins */ ''}
                     ${isAdmin ? `<button class="delete-payout-btn" data-payout-id="${p.submitted_at}">Delete</button>` : ''}
                 </div>
             `).join('');
