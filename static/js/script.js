@@ -250,7 +250,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }).then(res => {
             if (res.status === 401) { window.location.href = '/login'; return Promise.reject('Session expired'); }
             if (!res.ok) { return res.json().then(errData => { throw new Error(errData.error || `Server error: ${res.status}`); }); }
-            return res.json;
+            return res.json(); // <-- FIXED: call the function
         }).then(data => handleSearchSuccess(data)).catch(error => handleSearchFailure(error));
     }
 
