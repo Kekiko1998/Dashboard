@@ -24,9 +24,12 @@
         </div>
         <div id="userInfo" class="user-info" style="display: none;">
             <span id="userName" class="user-name"></span>
-            <a href="/logout" class="logout-button" title="Sign Out">🚪</a>
+            <a href="/logout" class="logout-button" title="Sign Out">
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="none" viewBox="0 0 24 24">
+                    <path fill="currentColor" d="M16.707 7.293a1 1 0 0 0-1.414 1.414L17.586 11H9a1 1 0 1 0 0 2h8.586l-2.293 2.293a1 1 0 0 0 1.414 1.414l4-4a1 1 0 0 0 0-1.414l-4-4ZM5 5a1 1 0 0 1 1-1h6a1 1 0 1 0 0-2H6a3 3 0 0 0-3 3v14a3 3 0 0 0 3 3h6a1 1 0 1 0 0-2H6a1 1 0 0 1-1-1V5Z"/>
+                </svg>
+            </a>
         </div>
-        <button id="darkModeToggle" title="Toggle Dark/Light Mode">☀️</button>
     </div>
   </div>
 
@@ -206,32 +209,7 @@
   </div>
   <div id="globalErrorMessage" class="error-message-main" style="padding: 10px; text-align: center; display:none;"></div>
 
-  <!-- Animated background container -->
-<div id="vanta-bg" style="position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:-1;"></div>
-
-<!-- Vanta.js and Three.js scripts -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.clouds.min.js"></script>
-<script>
-  document.addEventListener('DOMContentLoaded', function() {
-    VANTA.CLOUDS({
-      el: "#vanta-bg",
-      mouseControls: true,
-      touchControls: true,
-      minHeight: 200.00,
-      minWidth: 200.00,
-      skyColor: 0x3fb5e3,
-      cloudColor: 0xadc1de,
-      cloudShadowColor: 0x183550,
-      sunColor: 0xff9919,
-      sunGlareColor: 0xff6633,
-      sunlightColor: 0xff9933,
-      speed: 1
-    });
-  });
-</script>
-
-<!-- Scripts at the end -->
+ 
 <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>

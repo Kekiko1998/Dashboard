@@ -17,7 +17,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const loadingIndicator = document.getElementById('loadingIndicator');
     const dashboardDataDisplay = document.getElementById('dashboardDataDisplay');
     const dashboardSearchError = document.getElementById('dashboardSearchError');
-    const darkModeToggleButton = document.getElementById('darkModeToggle');
     const adminTabBtn = document.getElementById('adminTabBtn');
     const userManagementTableContainer = document.getElementById('userManagementTableContainer');
     const adminStatusMessage = document.getElementById('adminStatusMessage');
@@ -121,23 +120,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // --- UI MANAGEMENT ---
-    function setDarkMode(isDark) {
-        if (isDark) {
-            document.body.classList.remove('light-mode');
-            darkModeToggleButton.textContent = '☀️';
-            localStorage.setItem('dashboardTheme', 'dark');
-        } else {
-            document.body.classList.add('light-mode');
-            darkModeToggleButton.textContent = '🌙';
-            localStorage.setItem('dashboardTheme', 'light');
-        }
-    }
-    darkModeToggleButton.addEventListener('click', () => {
-        const isCurrentlyDark = !document.body.classList.contains('light-mode');
-        setDarkMode(!isCurrentlyDark);
-    });
-    if (localStorage.getItem('dashboardTheme') === 'light') { setDarkMode(false); } else { setDarkMode(true); }
-
     window.showTab = function(tabId, clickedButton) {
         document.querySelectorAll(".tab-content").forEach(tab => tab.classList.remove('active-content'));
         document.querySelectorAll(".tab-button").forEach(btn => btn.classList.remove("active"));
@@ -268,7 +250,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }).then(res => {
             if (res.status === 401) { window.location.href = '/login'; return Promise.reject('Session expired'); }
             if (!res.ok) { return res.json().then(errData => { throw new Error(errData.error || `Server error: ${res.status}`); }); }
-            return res.json();
+            return res.json;
         }).then(data => handleSearchSuccess(data)).catch(error => handleSearchFailure(error));
     }
 
