@@ -41,6 +41,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let isAdmin = false;
     let userPermissions = new Set();
     const statusOptions = ['PAID', 'DELAYED', 'UPDATING', 'INVALID', 'UNOFFICIAL', 'ON GOING'];
+    let autoRefreshInterval = null;
+    let lastSearchParams = null;
 
     // --- Initial Data Fetching & UI Setup ---
     function setupUIForUser(userInfo) {
@@ -229,8 +231,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // --- Search & Data Handling ---
-    function performSearch() {
-        const month = monthSelect.value, week = weekSelect.value, palcode = palcodeInput.value.trim();
+    function performSearch(auto = false) {
+        const month = monthSelect.value, week = weekSelect.value;
         let baNamesToSearch = [];
         if (userPermissions.has('MULTI_SELECT') || userPermissions.has('SEARCH_ALL')) {
             const checkedBoxes = baNameCheckboxList.querySelectorAll('input[type="checkbox"]:checked');
@@ -249,14 +251,18 @@ document.addEventListener('DOMContentLoaded', function() {
         showTab('dashboardDisplayArea', dashboardTabBtn); 
         dashboardPlaceholder.style.display = 'none'; dashboardDataDisplay.style.display = 'none';
         dashboardSearchError.style.display = 'none'; loadingIndicator.style.display = 'flex';
-        const searchPayload = { month: month, week: week, baNames: baNamesToSearch, palcode: palcode };
+        const searchPayload = { month: month, week: week, baNames: baNamesToSearch };
         fetch('/api/search', {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(searchPayload),
         }).then(res => {
             if (res.status === 401) { window.location.href = '/login'; return Promise.reject('Session expired'); }
             if (!res.ok) { return res.json().then(errData => { throw new Error(errData.error || `Server error: ${res.status}`); }); }
             return res.json(); // <-- FIXED: call the function
-        }).then(data => handleSearchSuccess(data)).catch(error => handleSearchFailure(error));
+        }).then(data => {
+            handleSearchSuccess(data);
+            // At the end of a successful search, save the params:
+            lastSearchParams = { month, week, baNames: baNamesToSearch };
+        }).catch(error => handleSearchFailure(error));
     }
 
     function handleSearchSuccess(data) {
@@ -273,6 +279,7 @@ document.addEventListener('DOMContentLoaded', function() {
             dashboardSearchError.querySelector('p').textContent = `⚠️ ${data.message || 'No data found for this query.'}`;
             dashboardSearchError.style.display = 'flex'; dashboardDataDisplay.style.display = 'none';
         }
+        // startAutoRefresh(); // <-- REMOVED: SSE is now responsible for auto-refresh
     }
     function handleSearchFailure(error) {
         if (error.message.includes('Session expired')) { console.log("Session expired, redirecting..."); return; }
@@ -624,4 +631,35 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     // Initial sync for admin tab
     syncAdminTabVisibility();
+
+    // Auto-refresh logic
+    let dashboardSSE = null;
+
+    function startDashboardSSE() {
+        if (dashboardSSE) dashboardSSE.close();
+        dashboardSSE = new EventSource('/events/dashboard');
+        dashboardSSE.onmessage = function(event) {
+            // Only refresh if dashboard is visible and lastSearchParams exist
+            const dashboardVisible = document.getElementById('dashboardDisplayArea').style.display !== 'none';
+            if (dashboardVisible && lastSearchParams) {
+                fetch('/api/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(lastSearchParams),
+                })
+                .then(res => res.json())
+                .then(data => handleSearchSuccess(data))
+                .catch(err => console.error('SSE refresh error:', err));
+            }
+        };
+        dashboardSSE.onerror = function() {
+            // Try to reconnect after a delay
+            setTimeout(startDashboardSSE, 5000);
+        };
+    }
+
+    // Start SSE after login/init
+    document.addEventListener('DOMContentLoaded', () => {
+        startDashboardSSE();
+    });
 });

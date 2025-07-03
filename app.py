@@ -1,7 +1,7 @@
 import os
 import json
 from datetime import datetime, timedelta
-from flask import Flask, jsonify, render_template, request, redirect, url_for, session, send_from_directory
+from flask import Flask, jsonify, render_template, request, redirect, url_for, session, send_from_directory, Response
 from flask_login import LoginManager, current_user, login_required, login_user, logout_user, UserMixin
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -11,6 +11,9 @@ import requests
 import pytz
 import uuid
 from werkzeug.utils import secure_filename
+from google.cloud import storage
+import queue
+import threading
 
 # --- Basic Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -31,6 +34,8 @@ ALL_PERMISSIONS = {
 }
 YOUR_TIMEZONE = 'Asia/Manila'
 PAYOUT_UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'payout_uploads')
+REDATABASE_SHEET_NAME = 'REDATABASE'  # <-- Add this line
+GCS_BUCKET_NAME = 'your-gcs-bucket-name'  # <-- Set your bucket name here
 
 # --- Flask App Initialization ---
 app = Flask(__name__)
@@ -73,6 +78,19 @@ try:
 except Exception as e:
     logging.error(f"FATAL ERROR: Could not load Google Sheets credentials. {e}")
     sheet_api = None
+
+# --- Google Cloud Storage Setup ---
+def get_gcs_client():
+    # Uses the same credentials as Sheets
+    return storage.Client.from_service_account_info(creds_service_account._service_account_info)
+
+def upload_file_to_gcs(file_stream, filename, content_type):
+    client = get_gcs_client()
+    bucket = client.bucket(GCS_BUCKET_NAME)
+    blob = bucket.blob(f'payout_qr/{filename}')
+    blob.upload_from_file(file_stream, content_type=content_type)
+    blob.make_public()
+    return blob.public_url
 
 # --- Helper Functions ---
 def to_float(value):
@@ -157,6 +175,23 @@ def callback():
     user = User(id=user_id, name=user_name, email=user_email, is_admin=is_admin, permissions=permissions)
     users[user_id] = user
     login_user(user)
+
+    # --- Only allow users that admin has allowed (whitelist) ---
+    global ALLOWED_USER_EMAILS
+    user_data = get_sheet_data(DATABASE_SHEET_ID, f"{USERS_SHEET_NAME}!A:E")
+    if not user_data or len(user_data) < 2:
+        ALLOWED_USER_EMAILS = set()
+    else:
+        # Assume column 1 (EMAIL) and column 0 (ID) are present, and column 3 (ALLOWED) is "YES" or blank
+        allowed = set()
+        for row in user_data[1:]:
+            if len(row) > 3 and row[3].strip().upper() == "YES":
+                allowed.add(row[1].strip().lower())
+        ALLOWED_USER_EMAILS = allowed
+
+    if user_email not in ALLOWED_USER_EMAILS and user_email not in [email.lower() for email in ADMIN_USER_EMAILS]:
+        return "Access denied. You are not allowed to use this web app. Please contact the administrator.", 403
+
     return redirect(url_for('index'))
 
 @app.route("/logout")
@@ -365,6 +400,7 @@ def save_dashboard():
         batch_update_body = { 'valueInputOption': 'USER_ENTERED', 'data': update_requests }
         sheet_api.values().batchUpdate(spreadsheetId=DATABASE_SHEET_ID, body=batch_update_body).execute()
         log_user_event('saveDashboardData', {'updated_palcodes': [r['palcode'] for r in updated_rows_from_client]})
+        notify_dashboard_clients()  # Notify clients about the update
         return jsonify({"success": True, "message": f"Successfully updated {len(update_requests)} cells."})
     except Exception as e:
         logging.error(f"Error saving dashboard data: {e}")
@@ -385,36 +421,26 @@ def submit_payout():
     payout_info_path = os.path.join(PAYOUT_UPLOAD_FOLDER, 'payout_submissions.json')
     submissions = []
     was_overwritten = False
-    
+
     try:
         # Load existing submissions if the file exists
         if os.path.exists(payout_info_path):
             with open(payout_info_path, 'r', encoding='utf-8') as f:
                 submissions = json.load(f)
-        
+
         # Check for and remove any existing submission from the current user
         current_user_email = current_user.email
         existing_submission = next((sub for sub in submissions if sub.get('user_email') == current_user_email), None)
-        
+
         if existing_submission:
             was_overwritten = True
-            # Delete the old QR image file
-            old_qr_filename = existing_submission.get('qr_image')
-            if old_qr_filename:
-                old_file_path = os.path.join(PAYOUT_UPLOAD_FOLDER, old_qr_filename)
-                try:
-                    os.remove(old_file_path)
-                    logging.info(f"Overwriting: Deleted old QR image {old_file_path}")
-                except FileNotFoundError:
-                    logging.warning(f"Old QR image not found during overwrite: {old_file_path}")
-            
-            # Filter out the old submission
+            # Remove old GCS file if needed (optional, not shown)
             submissions = [sub for sub in submissions if sub.get('user_email') != current_user_email]
 
-        # Save the new QR file
+        # Save the new QR file to GCS
         filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(qr_file.filename)}"
-        file_path = os.path.join(PAYOUT_UPLOAD_FOLDER, filename)
-        qr_file.save(file_path)
+        qr_file.stream.seek(0)
+        gcs_url = upload_file_to_gcs(qr_file.stream, filename, qr_file.content_type)
 
         # Add the new submission
         submissions.append({
@@ -422,18 +448,18 @@ def submit_payout():
             'ba_name': ba_name,
             'mop_account_name': mop_account_name,
             'mop_number': mop_number,
-            'qr_image': filename,
+            'qr_image': gcs_url,
             'submitted_at': datetime.now().isoformat()
         })
-        
-        # Write the updated list back to the file
+
+        # Write the updated list back to the file (still local for metadata)
         with open(payout_info_path, 'w', encoding='utf-8') as f:
             json.dump(submissions, f, indent=2)
 
     except Exception as e:
         logging.error(f"Error during payout submission: {e}")
         return jsonify({'success': False, 'error': 'Failed to save payout info.'}), 500
-    
+
     message = "Payout info updated successfully. Your previous submission was overwritten." if was_overwritten else "Payout info submitted successfully."
     return jsonify({'success': True, 'message': message})
 
@@ -498,6 +524,7 @@ def list_payouts():
     else:
         visible_submissions = [s for s in submissions if s.get('user_email', '').lower() == current_user.email.lower()]
 
+    # No change needed: qr_image is now a GCS URL
     return jsonify({'success': True, 'payouts': visible_submissions})
 
 @app.route('/uploads/<filename>')
@@ -558,6 +585,49 @@ def find_user_row(users_sheet, email):
         if len(row) > 1 and row[1].strip().lower() == email:
             return idx
     return -1
+
+# --- Helper to get data from either DATABASE or REDATABASE ---
+def get_database_data(use_redatabase=False, range_str="A:L"):
+    """
+    Helper to fetch data from DATABASE or REDATABASE.
+    Set use_redatabase=True to fetch from REDATABASE.
+    """
+    sheet_name = REDATABASE_SHEET_NAME if use_redatabase else DATABASE_SHEET_NAME
+    return get_sheet_data(DATABASE_SHEET_ID, f"{sheet_name}!{range_str}")
+
+@app.route('/api/some-protected-endpoint')
+@login_required
+def some_protected():
+    if 'SPECIAL_PERMISSION' not in current_user.permissions:
+        return jsonify({'error': 'Forbidden'}), 403
+    # ...existing code...
+
+# --- Dashboard Events Streaming ---
+# Global list of queues for connected clients
+dashboard_event_queues = []
+
+@app.route('/events/dashboard')
+@login_required
+def dashboard_events():
+    def event_stream(q):
+        try:
+            while True:
+                msg = q.get()
+                yield f"data: {msg}\n\n"
+        except GeneratorExit:
+            pass
+
+    q = queue.Queue()
+    dashboard_event_queues.append(q)
+    try:
+        return Response(event_stream(q), mimetype="text/event-stream")
+    finally:
+        dashboard_event_queues.remove(q)
+
+def notify_dashboard_clients():
+    # Call this after dashboard data changes
+    for q in dashboard_event_queues:
+        q.put("update")
 
 if __name__ == '__main__':
     os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'

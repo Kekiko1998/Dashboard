@@ -9,6 +9,38 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
+  <!-- Background Music -->
+  <audio id="bgMusic" src="/static/music/SodaPop.mp3" loop hidden></audio>
+
+  <script>
+  document.addEventListener('DOMContentLoaded', function() {
+      const audio = document.getElementById('bgMusic');
+      let playing = false;
+      let firstClick = true;
+
+      document.body.addEventListener('click', function(e) {
+          // Prevent toggling when clicking on form elements or buttons
+          if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'LABEL' || e.target.closest('form')) {
+              return;
+          }
+          if (firstClick) {
+              audio.volume = 0.5;
+              audio.play();
+              playing = true;
+              firstClick = false;
+          } else {
+              if (playing) {
+                  audio.pause();
+                  playing = false;
+              } else {
+                  audio.play();
+                  playing = true;
+              }
+          }
+      });
+  });
+  </script>
+
   <!-- Tab Navigation & Dark Mode Toggle -->
   <div class="top-navigation">
     <div id="topLeftDynamicContent" class="top-left-dynamic-content">
@@ -74,7 +106,7 @@
                         </select>
                         
                         <!-- SINGLE BA NAME INPUT (for users without permission) -->
-                        <input type="text" id="baNameInput" placeholder="ENTER BA NAME" autocomplete="on" list="baNameSuggestions" style="display: block;">
+                        <input type="text" id="baNameInput" placeholder="ENTER BA NAME" autocomplete="on" list="baNameSuggestions" style="display: none;">
                         <datalist id="baNameSuggestions"></datalist>
 
                         <!-- *** CORRECTED HTML STRUCTURE *** -->
@@ -88,7 +120,6 @@
                             </div>
                         </div>
 
-                        <input type="text" id="palcodeInput" placeholder="ENTER PALCODE (OPTIONAL)">
                         <button id="searchButton" class="search-button">SEARCH</button>
                     </div>
                     <div id="homeErrorMessage" class="error-message-main"></div>
@@ -176,7 +207,7 @@
         <!-- ADMIN AREA CONTENT -->
         <div id="adminArea" class="tab-content">
             <div class="admin-panel-container">
-                <h1>User Management</h1>
+                <h2>User Management</h2>
                 <p>Grant or revoke specific permissions for users. Admins have all permissions by default and cannot be changed.</p>
                 <div id="adminStatusMessage" class="admin-status-message"></div>
                 <div id="userManagementTableContainer">
