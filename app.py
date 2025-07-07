@@ -313,20 +313,33 @@ def search_dashboard_data():
         except (ValueError, IndexError): continue
     final_ranked_ba_list = sorted(ba_period_fds.values(), key=lambda x: x['totalFd'], reverse=True)
     ba_incentives_map, sum_of_all_individual_incentives = {}, 0
-    if overall_total_valid_fd >= 6000:
+    # --- Only count FDs above 100 for incentive eligibility ---
+    if overall_total_valid_fd >= 9000:
         for i, ba in enumerate(final_ranked_ba_list):
-            rank, incentive = i + 1, 0
-            if rank == 1: incentive = 3000
-            elif rank == 2: incentive = 1500
-            elif rank == 3: incentive = 900
-            elif 4 <= rank <= 6: incentive = 500
-            elif rank > 6 and ba['totalFd'] > 0: incentive = 200
+            rank = i + 1
+            eligible_fd = max(ba['totalFd'] - 100, 0)
+            incentive = 0
+            if eligible_fd > 0:
+                if rank == 1:
+                    # If rank 1's totalFd >= 3000, incentive is 4000
+                    if ba['totalFd'] >= 3000:
+                        incentive = 4000
+                    else:
+                        incentive = 3000
+                elif rank == 2:
+                    incentive = 1500
+                elif rank == 3:
+                    incentive = 900
+                elif 4 <= rank <= 6:
+                    incentive = 500
+                elif rank > 6:
+                    incentive = 200
             if incentive > 0:
                 ba_incentives_map[ba['originalName'].upper()] = incentive
                 sum_of_all_individual_incentives += incentive
     filtered_rows = [row for row in period_data_rows if ((not search_ba_names_lower or (len(row) > BA_NAME and row[BA_NAME].strip().lower() in search_ba_names_lower)) and (not search_palcode_lower or (len(row) > PALCODE and row[PALCODE].strip().lower() == search_palcode_lower)))]
     results_for_table = filtered_rows
-    commission_map = { 25.00: 5, 60.00: 10, 80.00: 20, 90.00: 10, 140.00: 10, 230.00: 20, 325.00: 25, 420.00: 30 }
+    commission_map = { 25.00: 5, 60.00: 10, 80.00: 10, 90.00: 10, 140.00: 10, 230.00: 20, 325.00: 25, 420.00: 30 }
     summary_for_display = {"totalRegistration": 0, "totalValidFd": 0, "totalSuspended": 0, "totalSalary": 0, "totalIncentives": 0, "totalCommission": 0}
     for row in filtered_rows:
         try:
