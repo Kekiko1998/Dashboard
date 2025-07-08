@@ -11,7 +11,6 @@ import requests
 import pytz
 import uuid
 from werkzeug.utils import secure_filename
-from google.cloud import storage
 import queue
 import threading
 
@@ -35,7 +34,6 @@ ALL_PERMISSIONS = {
 YOUR_TIMEZONE = 'Asia/Manila'
 PAYOUT_UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'payout_uploads')
 REDATABASE_SHEET_NAME = 'REDATABASE'  # <-- Add this line
-GCS_BUCKET_NAME = 'payout-uploads'  # <-- Set your bucket name here
 
 # --- Flask App Initialization ---
 app = Flask(__name__)
@@ -79,29 +77,13 @@ except Exception as e:
     logging.error(f"FATAL ERROR: Could not load Google Sheets credentials. {e}")
     sheet_api = None
 
-# --- Google Cloud Storage Setup ---
-def get_gcs_client():
-    # Uses the same credentials as Sheets, but must be a ServiceAccountCredentials instance
-    from google.oauth2.service_account import Credentials as ServiceAccountCredentials
-    if isinstance(creds_service_account, service_account.Credentials) and hasattr(creds_service_account, 'info'):
-        # If loaded from file, creds_service_account.info exists
-        return storage.Client.from_service_account_info(creds_service_account.info)
-    elif hasattr(creds_service_account, '_service_account_info'):
-        # If loaded from dict, _service_account_info exists
-        return storage.Client.from_service_account_info(creds_service_account._service_account_info)
-    elif hasattr(creds_service_account, 'service_account_email'):
-        # Fallback: try default client (will work if GOOGLE_APPLICATION_CREDENTIALS is set)
-        return storage.Client()
-    else:
-        raise RuntimeError("No valid service account credentials for GCS.")
 
-def upload_file_to_gcs(file_stream, filename, content_type):
-    client = get_gcs_client()
-    bucket = client.bucket(GCS_BUCKET_NAME)
-    blob = bucket.blob(f'payout_qr/{filename}')
-    blob.upload_from_file(file_stream, content_type=content_type)
-    blob.make_public()
-    # Return only the filename, not the full GCS URL
+# --- Local File Upload ---
+def upload_file_locally(file_stream, filename):
+    file_path = os.path.join(PAYOUT_UPLOAD_FOLDER, filename)
+    file_stream.seek(0)
+    with open(file_path, 'wb') as f:
+        f.write(file_stream.read())
     return filename
 
 # --- Helper Functions ---
@@ -461,14 +443,9 @@ def submit_payout():
             was_overwritten = True
             submissions = [sub for sub in submissions if sub.get('user_email') != current_user_email]
 
-        # Save the new QR file to GCS and also locally for /uploads/<filename>
+        # Save the new QR file locally only
         filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(qr_file.filename)}"
-        qr_file.stream.seek(0)
-        # Save to GCS (if needed)
-        upload_file_to_gcs(qr_file.stream, filename, qr_file.content_type)
-        # Save locally for /uploads/<filename>
-        qr_file.stream.seek(0)
-        qr_file.save(os.path.join(PAYOUT_UPLOAD_FOLDER, filename))
+        upload_file_locally(qr_file.stream, filename)
 
         # Add the new submission (store only the filename)
         submissions.append({
