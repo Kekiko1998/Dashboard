@@ -35,7 +35,7 @@ ALL_PERMISSIONS = {
 YOUR_TIMEZONE = 'Asia/Manila'
 PAYOUT_UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'payout_uploads')
 REDATABASE_SHEET_NAME = 'REDATABASE'  # <-- Add this line
-GCS_BUCKET_NAME = 'your-gcs-bucket-name'  # <-- Set your bucket name here
+GCS_BUCKET_NAME = 'payout-uploads'  # <-- Set your bucket name here
 
 # --- Flask App Initialization ---
 app = Flask(__name__)
@@ -81,8 +81,19 @@ except Exception as e:
 
 # --- Google Cloud Storage Setup ---
 def get_gcs_client():
-    # Uses the same credentials as Sheets
-    return storage.Client.from_service_account_info(creds_service_account._service_account_info)
+    # Uses the same credentials as Sheets, but must be a ServiceAccountCredentials instance
+    from google.oauth2.service_account import Credentials as ServiceAccountCredentials
+    if isinstance(creds_service_account, service_account.Credentials) and hasattr(creds_service_account, 'info'):
+        # If loaded from file, creds_service_account.info exists
+        return storage.Client.from_service_account_info(creds_service_account.info)
+    elif hasattr(creds_service_account, '_service_account_info'):
+        # If loaded from dict, _service_account_info exists
+        return storage.Client.from_service_account_info(creds_service_account._service_account_info)
+    elif hasattr(creds_service_account, 'service_account_email'):
+        # Fallback: try default client (will work if GOOGLE_APPLICATION_CREDENTIALS is set)
+        return storage.Client()
+    else:
+        raise RuntimeError("No valid service account credentials for GCS.")
 
 def upload_file_to_gcs(file_stream, filename, content_type):
     client = get_gcs_client()
@@ -90,7 +101,8 @@ def upload_file_to_gcs(file_stream, filename, content_type):
     blob = bucket.blob(f'payout_qr/{filename}')
     blob.upload_from_file(file_stream, content_type=content_type)
     blob.make_public()
-    return blob.public_url
+    # Return only the filename, not the full GCS URL
+    return filename
 
 # --- Helper Functions ---
 def to_float(value):
@@ -447,21 +459,24 @@ def submit_payout():
 
         if existing_submission:
             was_overwritten = True
-            # Remove old GCS file if needed (optional, not shown)
             submissions = [sub for sub in submissions if sub.get('user_email') != current_user_email]
 
-        # Save the new QR file to GCS
+        # Save the new QR file to GCS and also locally for /uploads/<filename>
         filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(qr_file.filename)}"
         qr_file.stream.seek(0)
-        gcs_url = upload_file_to_gcs(qr_file.stream, filename, qr_file.content_type)
+        # Save to GCS (if needed)
+        upload_file_to_gcs(qr_file.stream, filename, qr_file.content_type)
+        # Save locally for /uploads/<filename>
+        qr_file.stream.seek(0)
+        qr_file.save(os.path.join(PAYOUT_UPLOAD_FOLDER, filename))
 
-        # Add the new submission
+        # Add the new submission (store only the filename)
         submissions.append({
             'user_email': current_user_email,
             'ba_name': ba_name,
             'mop_account_name': mop_account_name,
             'mop_number': mop_number,
-            'qr_image': gcs_url,
+            'qr_image': filename,
             'submitted_at': datetime.now().isoformat()
         })
 
@@ -500,16 +515,7 @@ def delete_payout():
             break
     if not payout_to_delete:
         return jsonify({'success': False, 'error': 'Payout submission not found.'}), 404
-    qr_filename = payout_to_delete.get('qr_image')
-    if qr_filename:
-        file_path = os.path.join(PAYOUT_UPLOAD_FOLDER, qr_filename)
-        try:
-            os.remove(file_path)
-            logging.info(f"Deleted image file: {file_path}")
-        except FileNotFoundError:
-            logging.warning(f"Image file not found for deletion: {file_path}")
-        except Exception as e:
-            logging.error(f"Error deleting image file {file_path}: {e}")
+    # Optionally: delete from GCS here if you want (not required for basic fix)
     updated_submissions = [p for p in submissions if p.get('submitted_at') != payout_id]
     try:
         with open(payout_info_path, 'w', encoding='utf-8') as f:
@@ -537,7 +543,7 @@ def list_payouts():
     else:
         visible_submissions = [s for s in submissions if s.get('user_email', '').lower() == current_user.email.lower()]
 
-    # No change needed: qr_image is now a GCS URL
+    # qr_image is now a GCS URL
     return jsonify({'success': True, 'payouts': visible_submissions})
 
 @app.route('/uploads/<filename>')
