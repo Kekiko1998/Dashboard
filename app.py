@@ -447,6 +447,11 @@ def submit_payout():
         filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(qr_file.filename)}"
         upload_file_locally(qr_file.stream, filename)
 
+        # --- Use Asia/Manila timezone for submitted_at ---
+        import pytz
+        manila_tz = pytz.timezone('Asia/Manila')
+        submitted_at = datetime.now(manila_tz).strftime('%Y-%m-%dT%H:%M:%S%z')
+
         # Add the new submission (store only the filename)
         submissions.append({
             'user_email': current_user_email,
@@ -456,6 +461,7 @@ def submit_payout():
             'qr_image': filename,
             'submitted_at': datetime.now().isoformat()
         })
+
 
         # Write the updated list back to the file (still local for metadata)
         with open(payout_info_path, 'w', encoding='utf-8') as f:
