@@ -307,27 +307,46 @@ def search_dashboard_data():
         except (ValueError, IndexError): continue
     final_ranked_ba_list = sorted(ba_period_fds.values(), key=lambda x: x['totalFd'], reverse=True)
     ba_incentives_map, sum_of_all_individual_incentives = {}, 0
-    # --- Only count FDs above 100 for incentive eligibility ---
+    # --- Only count FDs 100 and above for incentive eligibility ---
     if overall_total_valid_fd >= 9000:
+        # --- New milestone for 20k+ total valid FD ---
+        milestone_20k = overall_total_valid_fd >= 20000
         for i, ba in enumerate(final_ranked_ba_list):
             rank = i + 1
-            eligible_fd = max(ba['totalFd'] - 100, 0)
+            eligible_fd = ba['totalFd'] if ba['totalFd'] >= 100 else 0
             incentive = 0
             if eligible_fd > 0:
-                if rank == 1:
-                    # If rank 1's totalFd >= 3000, incentive is 4000
-                    if ba['totalFd'] >= 3000:
-                        incentive = 4000
-                    else:
-                        incentive = 3000
-                elif rank == 2:
-                    incentive = 1500
-                elif rank == 3:
-                    incentive = 900
-                elif 4 <= rank <= 6:
-                    incentive = 500
-                elif rank > 6:
-                    incentive = 200
+                if milestone_20k:
+                    # Apply new milestone incentives for 20k+
+                    if rank == 1:
+                        incentive = 5000
+                    elif rank == 2:
+                        incentive = 2500
+                    elif rank == 3:
+                        incentive = 1500
+                    elif 4 <= rank <= 6:
+                        incentive = 900
+                    elif 7 <= rank <= 10:
+                        incentive = 500
+                    elif rank > 10 and ba['totalFd'] >= 300:
+                        incentive = 400
+                    elif rank > 10:
+                        incentive = 200
+                else:
+                    # Existing incentive logic
+                    if rank == 1:
+                        if ba['totalFd'] >= 3000:
+                            incentive = 4000
+                        else:
+                            incentive = 3000
+                    elif rank == 2:
+                        incentive = 1500
+                    elif rank == 3:
+                        incentive = 900
+                    elif 4 <= rank <= 6:
+                        incentive = 500
+                    elif rank > 6:
+                        incentive = 200
             if incentive > 0:
                 ba_incentives_map[ba['originalName'].upper()] = incentive
                 sum_of_all_individual_incentives += incentive
@@ -567,12 +586,15 @@ def log_user_event(function_name, inputs):
         local_now = utc_now.astimezone(local_tz)
         timestamp = local_now.strftime('%A, %B %d, %Y, %I:%M:%S %p')
         user_email = current_user.email if current_user.is_authenticated else "Anonymous"
+        # --- Split inputs into separate columns ---
+        month = inputs.get('month', 'N/A')
+        week = inputs.get('week', 'N/A').replace('week ', '')
+        ba_names = ', '.join(inputs.get('baNames', [])) if inputs.get('baNames') else "N/A"
         if function_name == 'saveDashboardData':
             formatted_inputs = f"Updated data for {len(inputs.get('updated_palcodes', []))} palcodes."
+            new_row_data = [timestamp, user_email, function_name, formatted_inputs, '', '', '']
         else:
-            ba_names_str = ', '.join(inputs.get('baNames', [])) if inputs.get('baNames') else "N/A"
-            formatted_inputs = f"Month - {inputs.get('month', 'N/A')}, Week - {inputs.get('week', 'N/A').replace('week ', '')}, Ba Name(s) - {ba_names_str}, Palcode - {inputs.get('palcode', 'N/A') or 'N/A'}"
-        new_row_data = [timestamp, user_email, function_name, formatted_inputs]
+            new_row_data = [timestamp, user_email, function_name, month, week, ba_names]
         requests_body = [
             { "insertDimension": { "range": { "sheetId": logs_sheet_id, "dimension": "ROWS", "startIndex": 1, "endIndex": 2 } } },
             { "updateCells": { "rows": [ { "values": [ {"userEnteredValue": {"stringValue": str(cell)}} for cell in new_row_data ] } ], "fields": "userEnteredValue", "start": { "sheetId": logs_sheet_id, "rowIndex": 1, "columnIndex": 0 } } }

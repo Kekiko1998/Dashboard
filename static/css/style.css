@@ -145,29 +145,33 @@ html, body {
   color: #ffe066; /* brighter yellow */
   border-bottom: 1px dashed var(--input-border-color);
 }
-#dashboardDataDisplay .left-panel .ba-ranking-list .ba-rank-item:last-child { border-bottom: none; }
-#dashboardDataDisplay .left-panel .ba-ranking-list .ba-rank-item .rank-number {
-  font-weight: bold;
-  margin-right: 8px;
-  color: #ffd700; /* gold */
-  min-width: 20px;
-  text-align: right;
+
+/* Add dynamic font-size for BA ranking: Top 1 is largest, then smaller */
+#dashboardDataDisplay .left-panel .ba-ranking-list .ba-rank-item.rank-1 {
+  font-size: 1.35em;
+  font-weight: 700;
+  color: #fffbe6;
 }
-#dashboardDataDisplay .left-panel .ba-ranking-list .ba-rank-item .ba-name {
-  flex-grow: 2;
-  font-family: var(--bebas-font);
-  text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-right: 8px;
-  color: #ffffff; /* very bright off-white */
+#dashboardDataDisplay .left-panel .ba-ranking-list .ba-rank-item.rank-2 {
+  font-size: 1.18em;
+  font-weight: 600;
+  color: #fffbe6;
 }
-#dashboardDataDisplay .left-panel .ba-ranking-list .ba-rank-item .ba-fd-count {
-  font-weight: bold;
-  font-family: var(--bebas-font);
-  font-size: 1.1em;
-  color: #ffffff; /* bright cyan */
+#dashboardDataDisplay .left-panel .ba-ranking-list .ba-rank-item.rank-3 {
+  font-size: 1.08em;
+  font-weight: 600;
+  color: #fffbe6;
+}
+#dashboardDataDisplay .left-panel .ba-ranking-list .ba-rank-item.rank-4,
+#dashboardDataDisplay .left-panel .ba-ranking-list .ba-rank-item.rank-5,
+#dashboardDataDisplay .left-panel .ba-ranking-list .ba-rank-item.rank-6 {
+  font-size: 0.98em;
+  font-weight: 500;
+}
+#dashboardDataDisplay .left-panel .ba-ranking-list .ba-rank-item {
+  /* fallback for others */
+  font-size: 0.85em;
+  font-weight: 400;
 }
 #dashboardDataDisplay .right-panel { flex-grow: 1; background-color: var(--panel-bg); padding: 20px; border-radius: 4px; display: flex; flex-direction: column; box-shadow: 0 1px 3px rgba(0,0,0,0.1); min-width: 0; }
 .results-table-container { flex-grow: 1; overflow-x: auto; overflow-y: auto; scrollbar-width: var(--scrollbar-width-firefox); scrollbar-color: var(--scrollbar-thumb-bg) var(--scrollbar-track-bg); }

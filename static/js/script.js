@@ -348,7 +348,8 @@ document.addEventListener('DOMContentLoaded', function() {
             baRankingListDiv.innerHTML = ''; 
             if (data.rankedBaList && data.rankedBaList.length > 0) {
                 data.rankedBaList.forEach((ba, index) => {
-                    const itemDiv = document.createElement('div'); itemDiv.classList.add('ba-rank-item');
+                    const itemDiv = document.createElement('div');
+                    itemDiv.classList.add('ba-rank-item', `rank-${index + 1}`);
                     const rankSpan = document.createElement('span'); rankSpan.classList.add('rank-number'); rankSpan.textContent = `${index + 1}.`;
                     const nameSpan = document.createElement('span'); nameSpan.classList.add('ba-name'); nameSpan.textContent = ba.originalName || "N/A"; nameSpan.title = ba.originalName || "N/A";
                     const fdSpan = document.createElement('span'); fdSpan.classList.add('ba-fd-count'); fdSpan.textContent = (ba.totalFd || 0).toLocaleString();
