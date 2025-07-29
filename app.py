@@ -658,3 +658,7 @@ def notify_dashboard_clients():
 if __name__ == '__main__':
     os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
     app.run(host='0.0.0.0', port=5001, debug=True)
+
+# To fix the error, run this in your terminal:
+# pip install flask-login
+# pip install pytz

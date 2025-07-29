@@ -292,20 +292,27 @@ document.addEventListener('DOMContentLoaded', function() {
     function determineSummaryStatus(tableData) {
         const statusColumnIndex = 11;
         if (!tableData || tableData.length === 0) return { text: 'N/A', class: '' };
-        const statuses = new Set(tableData.map(row => row[statusColumnIndex]?.toString().trim().toLowerCase()).filter(Boolean));
-        if (statuses.size === 0) return { text: 'N/A', class: '' };
-        if (statuses.size === 1) {
-            const singleStatus = statuses.values().next().value; const formattedText = singleStatus.replace(/-/g, ' ').toUpperCase();
-            return { text: formattedText, class: `status-${singleStatus.replace(/\s+/g, '-')}` };
-        }
-        const priority = ['delayed', 'on-going', 'updating', 'paid', 'invalid', 'unofficial'];
-        for (const p of priority) {
-            if (statuses.has(p)) {
-                const formattedText = p.replace(/-/g, ' ').toUpperCase();
-                return { text: formattedText, class: `status-${p.replace(/\s+/g, '-')}` };
+        // Count occurrences of each status (case-insensitive)
+        const statusCounts = {};
+        tableData.forEach(row => {
+            const status = row[statusColumnIndex]?.toString().trim().toLowerCase();
+            if (status) {
+                statusCounts[status] = (statusCounts[status] || 0) + 1;
             }
-        }
-        return { text: 'MIXED', class: '' };
+        });
+        const statuses = Object.keys(statusCounts);
+        if (statuses.length === 0) return { text: 'N/A', class: '' };
+        // Find the status with the highest count (majority)
+        let majorityStatus = statuses[0];
+        let maxCount = statusCounts[majorityStatus];
+        statuses.forEach(s => {
+            if (statusCounts[s] > maxCount) {
+                majorityStatus = s;
+                maxCount = statusCounts[s];
+            }
+        });
+        const formattedText = majorityStatus.replace(/-/g, ' ').toUpperCase();
+        return { text: formattedText, class: `status-${majorityStatus.replace(/\s+/g, '-')}` };
     }
     
     function populateDashboardWithData(data) {
