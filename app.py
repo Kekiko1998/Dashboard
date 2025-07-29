@@ -377,9 +377,23 @@ def search_dashboard_data():
         majority_status = max(status_counts.items(), key=lambda x: x[1])[0]
         return majority_status.upper()
     majority_status = get_majority_status(results_for_table)
-    if overall_total_valid_fd >= 6000:
-        if search_ba_names_lower: summary_for_display['totalIncentives'] = sum(ba_incentives_map.get(name.upper(), 0) for name in ba_names)
-        elif 'SEARCH_ALL' in current_user.permissions: summary_for_display['totalIncentives'] = sum_of_all_individual_incentives
+    # --- Correct summary calculation with right indices ---
+    for row in filtered_rows:
+        try:
+            summary_for_display['totalRegistration'] += to_float(row[4]) if len(row) > 4 else 0  # REG
+            summary_for_display['totalValidFd'] += to_float(row[5]) if len(row) > 5 else 0      # VALID_FD
+            summary_for_display['totalSuspended'] += to_float(row[6]) if len(row) > 6 else 0    # SUSPENDED_FD
+            summary_for_display['totalDisqualified'] += to_float(row[7]) if len(row) > 7 else 0 # DISQUALIFIED
+            summary_for_display['totalNoFdTurnover'] += to_float(row[8]) if len(row) > 8 else 0 # NO_FD_TURNOVER
+            summary_for_display['totalSalary'] += to_float(row[12]) if len(row) > 12 else 0     # SALARY
+            if 'VIEW_COMMISSION' in current_user.permissions:
+                current_fd = to_float(row[5]) if len(row) > 5 else 0        # VALID_FD
+                current_rate = to_float(row[9]) if len(row) > 9 else 0      # RATE
+                commission_multiplier = commission_map.get(current_rate, 0)
+                summary_for_display['totalCommission'] += (current_fd * commission_multiplier)
+        except IndexError as e: 
+            logging.warning(f"Skipping row during summary calculation due to missing columns: {row} -> {e}")
+    # ...existing code...
     return jsonify({
         "baNameDisplay": ba_display_name,
         "searchCriteria": search_criteria_frontend,
