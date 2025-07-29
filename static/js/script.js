@@ -289,32 +289,6 @@ document.addEventListener('DOMContentLoaded', function() {
         console.error("Server Call Error:", error);
     }
 
-    function determineSummaryStatus(tableData) {
-        const statusColumnIndex = 11;
-        if (!tableData || tableData.length === 0) return { text: 'N/A', class: '' };
-        // Count occurrences of each status (case-insensitive)
-        const statusCounts = {};
-        tableData.forEach(row => {
-            const status = row[statusColumnIndex]?.toString().trim().toLowerCase();
-            if (status) {
-                statusCounts[status] = (statusCounts[status] || 0) + 1;
-            }
-        });
-        const statuses = Object.keys(statusCounts);
-        if (statuses.length === 0) return { text: 'N/A', class: '' };
-        // Find the status with the highest count (majority)
-        let majorityStatus = statuses[0];
-        let maxCount = statusCounts[majorityStatus];
-        statuses.forEach(s => {
-            if (statusCounts[s] > maxCount) {
-                majorityStatus = s;
-                maxCount = statusCounts[s];
-            }
-        });
-        const formattedText = majorityStatus.replace(/-/g, ' ').toUpperCase();
-        return { text: formattedText, class: `status-${majorityStatus.replace(/\s+/g, '-')}` };
-    }
-    
     function populateDashboardWithData(data) {
         const baNameDisplay = document.getElementById('baNameDisplay'),
             totalRegistrationValue = document.getElementById('totalRegistrationValue'),
@@ -364,7 +338,16 @@ document.addEventListener('DOMContentLoaded', function() {
         if(monthDisplay) monthDisplay.textContent = data.monthDisplay || "N/A";
         if(weekDisplay) weekDisplay.textContent = data.weekDisplay || "N/A";
         if(dateRangeDisplay) dateRangeDisplay.textContent = data.dateRangeDisplay || ""; 
-        if (statusValue) { const summaryStatus = determineSummaryStatus(data.resultsTable); statusValue.textContent = summaryStatus.text; statusValue.className = summaryStatus.class; }
+        if (statusValue) {
+            // Use backend-provided status (majority status)
+            let statusText = data.status || 'N/A';
+            let statusClass = '';
+            if (statusText && statusText !== 'N/A') {
+                statusClass = `status-${statusText.replace(/\s+/g, '-').toLowerCase()}`;
+            }
+            statusValue.textContent = statusText;
+            statusValue.className = statusClass;
+        }
         if(lastUpdateValue) { lastUpdateValue.textContent = data.lastUpdate || "N/A"; }
         if (baRankingListDiv) {
             baRankingListDiv.innerHTML = ''; 
