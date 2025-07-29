@@ -353,26 +353,45 @@ def search_dashboard_data():
     filtered_rows = [row for row in period_data_rows if ((not search_ba_names_lower or (len(row) > BA_NAME and row[BA_NAME].strip().lower() in search_ba_names_lower)) and (not search_palcode_lower or (len(row) > PALCODE and row[PALCODE].strip().lower() == search_palcode_lower)))]
     results_for_table = filtered_rows
     commission_map = { 25.00: 5, 60.00: 10, 80.00: 10, 90.00: 10, 140.00: 10, 230.00: 20, 325.00: 25, 420.00: 30 }
-    summary_for_display = {"totalRegistration": 0, "totalValidFd": 0, "totalSuspended": 0, "totalDisqualified": 0, "totalNoFdTurnover": 0, "totalSalary": 0, "totalIncentives": 0, "totalCommission": 0}
-    for row in filtered_rows:
-        try:
-            summary_for_display['totalRegistration'] += to_float(row[REG]) if len(row) > REG else 0
-            summary_for_display['totalValidFd'] += to_float(row[VALID_FD]) if len(row) > VALID_FD else 0
-            summary_for_display['totalSuspended'] += to_float(row[SUSPENDED_FD]) if len(row) > SUSPENDED_FD else 0
-            summary_for_display['totalDisqualified'] += to_float(row[DISQUALIFIED]) if len(row) > DISQUALIFIED else 0
-            summary_for_display['totalNoFdTurnover'] += to_float(row[NO_FD_TURNOVER]) if len(row) > NO_FD_TURNOVER else 0
-            summary_for_display['totalSalary'] += to_float(row[SALARY]) if len(row) > SALARY else 0
-            if 'VIEW_COMMISSION' in current_user.permissions:
-                current_fd = to_float(row[VALID_FD]) if len(row) > VALID_FD else 0
-                current_rate = to_float(row[RATE]) if len(row) > RATE else 0
-                commission_multiplier = commission_map.get(current_rate, 0)
-                summary_for_display['totalCommission'] += (current_fd * commission_multiplier)
-        except IndexError as e: 
-            logging.warning(f"Skipping row during summary calculation due to missing columns: {row} -> {e}")
+    summary_for_display = {
+        "totalRegistration": 0,
+        "totalValidFd": 0,
+        "totalSuspended": 0,
+        "totalDisqualified": 0,
+        "totalNoFdTurnover": 0,
+        "totalSalary": 0,
+        "totalIncentives": 0,
+        "totalCommission": 0
+    }
+    # --- Majority status calculation ---
+    def get_majority_status(rows):
+        STATUS_IDX = 13  # index for 'Status' column
+        status_counts = {}
+        for row in rows:
+            if len(row) > STATUS_IDX:
+                status = str(row[STATUS_IDX]).strip().lower()
+                if status:
+                    status_counts[status] = status_counts.get(status, 0) + 1
+        if not status_counts:
+            return "N/A"
+        majority_status = max(status_counts.items(), key=lambda x: x[1])[0]
+        return majority_status.upper()
+    majority_status = get_majority_status(results_for_table)
     if overall_total_valid_fd >= 6000:
         if search_ba_names_lower: summary_for_display['totalIncentives'] = sum(ba_incentives_map.get(name.upper(), 0) for name in ba_names)
         elif 'SEARCH_ALL' in current_user.permissions: summary_for_display['totalIncentives'] = sum_of_all_individual_incentives
-    return jsonify({ "baNameDisplay": ba_display_name, "searchCriteria": search_criteria_frontend, "summary": summary_for_display, "monthDisplay": search_month.upper(), "weekDisplay": search_week.upper(), "dateRangeDisplay": date_range_display, "status": "Active", "resultsTable": results_for_table, "rankedBaList": final_ranked_ba_list, "lastUpdate": last_update_timestamp })
+    return jsonify({
+        "baNameDisplay": ba_display_name,
+        "searchCriteria": search_criteria_frontend,
+        "summary": summary_for_display,
+        "monthDisplay": search_month.upper(),
+        "weekDisplay": search_week.upper(),
+        "dateRangeDisplay": date_range_display,
+        "status": majority_status,  # <-- Use majority status here
+        "resultsTable": results_for_table,
+        "rankedBaList": final_ranked_ba_list,
+        "lastUpdate": last_update_timestamp
+    })
 
 @app.route('/api/save_dashboard', methods=['POST'])
 @login_required
@@ -383,16 +402,23 @@ def save_dashboard():
     if not updated_rows_from_client:
         return jsonify({"success": False, "error": "No data received"}), 400
     try:
-        all_sheet_data = get_sheet_data(DATABASE_SHEET_ID, f"{DATABASE_SHEET_NAME}!A:L")
+        all_sheet_data = get_sheet_data(DATABASE_SHEET_ID, f"{DATABASE_SHEET_NAME}!A:N")
         if not all_sheet_data:
             return jsonify({"success": False, "error": "Could not fetch current database state."}), 500
 
         # Build a list of all rows for matching
         update_requests = []
         editable_cols = {
-            'month': {'idx': 1, 'col': 'B'}, 'week': {'idx': 2, 'col': 'C'}, 'ba_name': {'idx': 3, 'col': 'D'},
-            'reg': {'idx': 4, 'col': 'E'}, 'valid_fd': {'idx': 5, 'col': 'F'}, 'suspended_fd': {'idx': 6, 'col': 'G'},
-            'total_ggr': {'idx': 9, 'col': 'J'}, 'status': {'idx': 11, 'col': 'L'}
+            'month': {'idx': 1, 'col': 'B'},
+            'week': {'idx': 2, 'col': 'C'},
+            'ba_name': {'idx': 3, 'col': 'D'},
+            'reg': {'idx': 4, 'col': 'E'},
+            'valid_fd': {'idx': 5, 'col': 'F'},
+            'suspended_fd': {'idx': 6, 'col': 'G'},
+            'disqualified': {'idx': 7, 'col': 'H'},
+            'no_fd_turnover': {'idx': 8, 'col': 'I'},
+            'total_ggr': {'idx': 11, 'col': 'L'},
+            'status': {'idx': 13, 'col': 'N'}
         }
         for client_row in updated_rows_from_client:
             palcode = client_row.get('palcode', '').strip()
