@@ -315,7 +315,7 @@ def search_dashboard_data():
             rank = i + 1
             eligible_fd = ba['totalFd'] if ba['totalFd'] >= 100 else 0
             incentive = 0
-            if eligible_fd > 0:
+            if eligible_fd >= 100:  # Only BAs with at least 100 valid FDs are eligible
                 if milestone_20k:
                     # Apply new milestone incentives for 20k+
                     if rank == 1:
@@ -393,7 +393,18 @@ def search_dashboard_data():
                 summary_for_display['totalCommission'] += (current_fd * commission_multiplier)
         except IndexError as e: 
             logging.warning(f"Skipping row during summary calculation due to missing columns: {row} -> {e}")
-    # ...existing code...
+    # --- Incentives calculation for summary (always set, even if 0) ---
+    summary_for_display['totalIncentives'] = 0
+    if overall_total_valid_fd >= 6000:
+        if search_ba_names_lower:
+            # Only sum incentives for BAs with at least 100 valid FDs
+            summary_for_display['totalIncentives'] = sum(
+                ba_incentives_map.get(name.upper(), 0)
+                for name in ba_names
+                if ba_incentives_map.get(name.upper(), 0) > 0
+            )
+        elif 'SEARCH_ALL' in current_user.permissions:
+            summary_for_display['totalIncentives'] = sum_of_all_individual_incentives
     return jsonify({
         "baNameDisplay": ba_display_name,
         "searchCriteria": search_criteria_frontend,
