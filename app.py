@@ -279,14 +279,15 @@ def search_dashboard_data():
         return jsonify({'error': 'Month and week required'}), 400
     if not ba_names and 'SEARCH_ALL' not in current_user.permissions:
         return jsonify({'error': 'BA name required'}), 400
-    all_sheet_data = get_sheet_data(DATABASE_SHEET_ID, f"{DATABASE_SHEET_NAME}!A:L")
+    all_sheet_data = get_sheet_data(DATABASE_SHEET_ID, f"{DATABASE_SHEET_NAME}!A:N")  # <-- Now up to column N
     if all_sheet_data is None:
         return jsonify({'error': 'Database unavailable'}), 500
     log_user_event('searchDashboardData', req_data)
     search_month, search_week = month.strip().lower(), week.strip().lower()
     search_ba_names_lower = [str(name).strip().lower() for name in ba_names if name]
     search_palcode_lower = palcode.strip().lower() if palcode else ""
-    PALCODE, MONTH, WEEK, BA_NAME, REG, VALID_FD, SUSPENDED_FD, RATE, GGR_PER_FD, TOTAL_GGR, SALARY, STATUS = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
+    # Update indices for new columns
+    PALCODE, MONTH, WEEK, BA_NAME, REG, VALID_FD, SUSPENDED_FD, DISQUALIFIED, NO_FD_TURNOVER, RATE, GGR_PER_FD, TOTAL_GGR, SALARY, STATUS = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13
     period_data_rows = [row for row in all_sheet_data[1:] if len(row) > WEEK and row[MONTH].strip().lower() == search_month and row[WEEK].strip().lower() == search_week]
     ba_display_name = "ALL BAs" if 'SEARCH_ALL' in current_user.permissions and not search_ba_names_lower else (f"MULTIPLE BAs ({len(search_ba_names_lower)})" if len(search_ba_names_lower) > 1 else (ba_names[0].strip().upper() if search_ba_names_lower else "N/A"))
     search_criteria_frontend = {'baNames': [name.strip().upper() for name in ba_names]}
@@ -296,7 +297,7 @@ def search_dashboard_data():
     local_now = utc_now.astimezone(local_tz)
     last_update_timestamp = local_now.strftime('%A, %B %d, %Y, %I:%M:%S %p')
     if not period_data_rows:
-        return jsonify({ "baNameDisplay": ba_display_name, "searchCriteria": search_criteria_frontend, "summary": {"totalRegistration": 0, "totalValidFd": 0, "totalSuspended": 0, "totalSalary": 0, "totalIncentives": 0, "totalCommission": 0}, "monthDisplay": search_month.upper(), "weekDisplay": search_week.upper(), "dateRangeDisplay": date_range_display, "status": "N/A", "resultsTable": [], "rankedBaList": [], "lastUpdate": last_update_timestamp, "message": "No records for selected period." })
+        return jsonify({ "baNameDisplay": ba_display_name, "searchCriteria": search_criteria_frontend, "summary": {"totalRegistration": 0, "totalValidFd": 0, "totalSuspended": 0, "totalDisqualified": 0, "totalNoFdTurnover": 0, "totalSalary": 0, "totalIncentives": 0, "totalCommission": 0}, "monthDisplay": search_month.upper(), "weekDisplay": search_week.upper(), "dateRangeDisplay": date_range_display, "status": "N/A", "resultsTable": [], "rankedBaList": [], "lastUpdate": last_update_timestamp, "message": "No records for selected period." })
     overall_total_valid_fd, ba_period_fds = 0, {}
     for row in period_data_rows:
         try:
@@ -309,7 +310,6 @@ def search_dashboard_data():
     ba_incentives_map, sum_of_all_individual_incentives = {}, 0
     # --- Only count FDs 100 and above for incentive eligibility ---
     if overall_total_valid_fd >= 9000:
-        # --- New milestone for 20k+ total valid FD ---
         milestone_20k = overall_total_valid_fd >= 20000
         for i, ba in enumerate(final_ranked_ba_list):
             rank = i + 1
@@ -353,12 +353,14 @@ def search_dashboard_data():
     filtered_rows = [row for row in period_data_rows if ((not search_ba_names_lower or (len(row) > BA_NAME and row[BA_NAME].strip().lower() in search_ba_names_lower)) and (not search_palcode_lower or (len(row) > PALCODE and row[PALCODE].strip().lower() == search_palcode_lower)))]
     results_for_table = filtered_rows
     commission_map = { 25.00: 5, 60.00: 10, 80.00: 10, 90.00: 10, 140.00: 10, 230.00: 20, 325.00: 25, 420.00: 30 }
-    summary_for_display = {"totalRegistration": 0, "totalValidFd": 0, "totalSuspended": 0, "totalSalary": 0, "totalIncentives": 0, "totalCommission": 0}
+    summary_for_display = {"totalRegistration": 0, "totalValidFd": 0, "totalSuspended": 0, "totalDisqualified": 0, "totalNoFdTurnover": 0, "totalSalary": 0, "totalIncentives": 0, "totalCommission": 0}
     for row in filtered_rows:
         try:
             summary_for_display['totalRegistration'] += to_float(row[REG]) if len(row) > REG else 0
             summary_for_display['totalValidFd'] += to_float(row[VALID_FD]) if len(row) > VALID_FD else 0
             summary_for_display['totalSuspended'] += to_float(row[SUSPENDED_FD]) if len(row) > SUSPENDED_FD else 0
+            summary_for_display['totalDisqualified'] += to_float(row[DISQUALIFIED]) if len(row) > DISQUALIFIED else 0
+            summary_for_display['totalNoFdTurnover'] += to_float(row[NO_FD_TURNOVER]) if len(row) > NO_FD_TURNOVER else 0
             summary_for_display['totalSalary'] += to_float(row[SALARY]) if len(row) > SALARY else 0
             if 'VIEW_COMMISSION' in current_user.permissions:
                 current_fd = to_float(row[VALID_FD]) if len(row) > VALID_FD else 0

@@ -309,7 +309,20 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function populateDashboardWithData(data) {
-        const baNameDisplay = document.getElementById('baNameDisplay'), totalRegistrationValue = document.getElementById('totalRegistrationValue'), totalValidFdValue = document.getElementById('totalValidFdValue'), totalSuspendedValue = document.getElementById('totalSuspendedValue'), totalSalaryValue = document.getElementById('totalSalaryValue'), totalIncentiveValue = document.getElementById('totalIncentiveValue'), monthDisplay = document.getElementById('monthDisplay'), weekDisplay = document.getElementById('weekDisplay'), dateRangeDisplay = document.getElementById('dateRangeDisplay'), statusValue = document.getElementById('statusValue'), lastUpdateValue = document.getElementById('lastUpdateValue'), baRankingListDiv = document.getElementById('baRankingList'), resultsTableContainer = document.getElementById('resultsTableContainer');
+        const baNameDisplay = document.getElementById('baNameDisplay'),
+            totalRegistrationValue = document.getElementById('totalRegistrationValue'),
+            totalValidFdValue = document.getElementById('totalValidFdValue'),
+            totalSuspendedValue = document.getElementById('totalSuspendedValue'),
+            totalDisqualifiedValue = document.getElementById('totalDisqualifiedValue'),
+            totalNoFdTurnoverValue = document.getElementById('totalNoFdTurnoverValue'),
+            totalSalaryValue = document.getElementById('totalSalaryValue'),
+            totalIncentiveValue = document.getElementById('totalIncentiveValue'),
+            monthDisplay = document.getElementById('monthDisplay'),
+            weekDisplay = document.getElementById('weekDisplay'),
+            dateRangeDisplay = document.getElementById('dateRangeDisplay'),
+            statusValue = document.getElementById('statusValue'),
+            lastUpdateValue = document.getElementById('lastUpdateValue'),
+            baRankingListDiv = document.getElementById('baRankingList'), resultsTableContainer = document.getElementById('resultsTableContainer');
         const commissionCard = document.getElementById('commissionCard');
         const totalCommissionValue = document.getElementById('totalCommissionValue');
 
@@ -336,6 +349,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if(totalRegistrationValue) animateValue(totalRegistrationValue, 0, summary.totalRegistration || 0, 700);
         if(totalValidFdValue) animateValue(totalValidFdValue, 0, summary.totalValidFd || 0, 700);
         if(totalSuspendedValue) animateValue(totalSuspendedValue, 0, summary.totalSuspended || 0, 700);
+        if(totalDisqualifiedValue) animateValue(totalDisqualifiedValue, 0, summary.totalDisqualified || 0, 700);
+        if(totalNoFdTurnoverValue) animateValue(totalNoFdTurnoverValue, 0, summary.totalNoFdTurnover || 0, 700);
         if(totalSalaryValue) animateValue(totalSalaryValue, 0, summary.totalSalary || 0, 700, true);
         if(totalIncentiveValue) animateValue(totalIncentiveValue, 0, summary.totalIncentives || 0, 700, true);
         if (totalCommissionValue && userPermissions.has('VIEW_COMMISSION')) { animateValue(totalCommissionValue, 0, summary.totalCommission || 0, 700); }
@@ -365,8 +380,12 @@ document.addEventListener('DOMContentLoaded', function() {
         } else { tableControls.style.display = 'none'; }
         if (data.resultsTable && data.resultsTable.length > 0) {
             const table = document.createElement('table'), thead = document.createElement('thead'), tbody = document.createElement('tbody'), headerRow = document.createElement('tr');
-            const headers = ['PALCODE','MONTH','WEEK','BA Name','REG','Valid FD','Suspended FD','Rate','GGR Per FD','Total GGR','SALARY','Status'];
-            const editableColumns = ['MONTH', 'WEEK', 'BA Name', 'REG', 'Valid FD', 'Suspended FD', 'Total GGR'];
+            // Updated headers to include Disqualified and NO FD TURNOVER after Suspended FD
+            const headers = [
+                'PALCODE','MONTH','WEEK','BA Name','REG','Valid FD','Suspended FD',
+                'Disqualified','NO FD TURNOVER','Rate','GGR Per FD','Total GGR','SALARY','Status'
+            ];
+            const editableColumns = ['MONTH', 'WEEK', 'BA Name', 'REG', 'Valid FD', 'Suspended FD', 'Disqualified', 'NO FD TURNOVER', 'Total GGR'];
             const thNo = document.createElement('th'); thNo.textContent = 'No.'; headerRow.appendChild(thNo);
             headers.forEach(text => { const th = document.createElement('th'); th.textContent = text.toUpperCase(); headerRow.appendChild(th); });
             thead.appendChild(headerRow); table.appendChild(thead);
@@ -655,11 +674,11 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         dashboardSSE.onerror = function() {
             // Try to reconnect after a delay
+            dashboardSSE.close();
             setTimeout(startDashboardSSE, 5000);
         };
     }
 
-    // Start SSE after login/init
     document.addEventListener('DOMContentLoaded', () => {
         startDashboardSSE();
     });
