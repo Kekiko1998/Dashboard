@@ -211,7 +211,7 @@ html, body {
 .salary-notes li strong { font-weight: bold; }
 .loading-indicator { text-align:center; padding:30px; font-size:1.2em; color:var(--text-color-main); font-weight:bold; width:100%; flex-grow:1; display:flex; align-items:center; justify-content:center;}
 #globalErrorMessage { display: none; color:var(--error-color); font-weight:bold;}
-.status-paid { color: #045729 !important; }
+.status-paid { color: #1fb35c !important; }
 .status-on-going { color: #0579a7 !important; }
 .status-delayed { color: #ffa806 !important; }
 .status-updating { color: #00f7ff !important; }
