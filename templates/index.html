@@ -9,13 +9,51 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
+  <!-- Background Music -->
+  <audio id="bgMusic" src="/static/Music/SodaPop.mp3" loop style="display:none"></audio>
+
+  <script>
+  document.addEventListener('DOMContentLoaded', function() {
+      const audio = document.getElementById('bgMusic');
+      let playing = false;
+      let firstClick = true;
+
+      document.body.addEventListener('click', function(e) {
+          // Prevent toggling when clicking on form elements or buttons
+          if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'LABEL' || e.target.closest('form')) {
+              return;
+          }
+          if (firstClick) {
+              audio.volume = 0.5;
+              audio.play();
+              playing = true;
+              firstClick = false;
+          } else {
+              if (playing) {
+                  audio.pause();
+                  playing = false;
+              } else {
+                  audio.play();
+                  playing = true;
+              }
+          }
+      });
+  });
+  </script>
+
   <!-- Tab Navigation & Dark Mode Toggle -->
   <div class="top-navigation">
     <div id="topLeftDynamicContent" class="top-left-dynamic-content">
         <!-- JS will move controls here -->
     </div>
     <div class="tabs-and-toggle-container">
-        <div class="tabs">
+        <!-- Burger menu button for mobile -->
+        <button id="burgerMenuBtn" class="burger-menu-btn" aria-label="Open menu">
+            <span class="burger-bar"></span>
+            <span class="burger-bar"></span>
+            <span class="burger-bar"></span>
+        </button>
+        <div class="tabs" id="mainTabs">
             <button id="homeTabBtn" class="tab-button active" onclick="showTab('homeArea', this)">Home</button>
             <button id="dashboardTabBtn" class="tab-button" onclick="showTab('dashboardDisplayArea', this)">Dashboard</button>
             <button id="salaryTabBtn" class="tab-button" onclick="showTab('salarySchemeArea', this)">Salary Scheme</button>
@@ -30,6 +68,16 @@
                 </svg>
             </a>
         </div>
+        <!-- Mobile menu overlay for foldout menu -->
+        <div id="mobileMenuOverlay" class="mobile-menu-overlay"></div>
+        <!-- Mobile menu container (foldout) -->
+        <nav id="mobileTabsMenu" class="mobile-tabs-menu">
+          <button id="mobileHomeTabBtn" class="tab-button" onclick="showTab('homeArea', this)">Home</button>
+          <button id="mobileDashboardTabBtn" class="tab-button" onclick="showTab('dashboardDisplayArea', this)">Dashboard</button>
+          <button id="mobileSalaryTabBtn" class="tab-button" onclick="showTab('salarySchemeArea', this)">Salary Scheme</button>
+          <button id="mobileAdminTabBtn" class="tab-button" onclick="showTab('adminArea', this)" style="display: none;">Admin</button>
+          <button id="mobilePayoutTabBtn" class="tab-button" onclick="showTab('payoutArea', this)">Payout</button>
+        </nav>
     </div>
   </div>
 
@@ -58,7 +106,7 @@
                         </select>
                         
                         <!-- SINGLE BA NAME INPUT (for users without permission) -->
-                        <input type="text" id="baNameInput" placeholder="ENTER BA NAME" autocomplete="on" list="baNameSuggestions" style="display: block;">
+                        <input type="text" id="baNameInput" placeholder="ENTER BA NAME" autocomplete="on" list="baNameSuggestions" style="display: none;">
                         <datalist id="baNameSuggestions"></datalist>
 
                         <!-- *** CORRECTED HTML STRUCTURE *** -->
@@ -72,7 +120,6 @@
                             </div>
                         </div>
 
-                        <input type="text" id="palcodeInput" placeholder="ENTER PALCODE (OPTIONAL)">
                         <button id="searchButton" class="search-button">SEARCH</button>
                     </div>
                     <div id="homeErrorMessage" class="error-message-main"></div>
@@ -100,7 +147,6 @@
                   <div class="summary-card"><span class="summary-label">TOTAL VALID FD</span><span class="summary-value" id="totalValidFdValue">0</span></div>
                   <div class="summary-card"><span class="summary-label">TOTAL SUSPENDED</span><span class="summary-value" id="totalSuspendedValue">0</span></div>
                   <div class="summary-card"><span class="summary-label">TOTAL SALARY</span><span class="summary-value" id="totalSalaryValue">0</span></div>
-                  <div class="summary-card"><span class="summary-label">INCENTIVES</span><span class="summary-value" id="totalIncentiveValue">₱0.00</span></div>
                   <div id="commissionCard" class="summary-card" style="display: none;">
                     <span class="summary-label">COMMISSION</span>
                     <span class="summary-value" id="totalCommissionValue">0</span>
@@ -160,7 +206,7 @@
         <!-- ADMIN AREA CONTENT -->
         <div id="adminArea" class="tab-content">
             <div class="admin-panel-container">
-                <h1>User Management</h1>
+                <h2>User Management</h2>
                 <p>Grant or revoke specific permissions for users. Admins have all permissions by default and cannot be changed.</p>
                 <div id="adminStatusMessage" class="admin-status-message"></div>
                 <div id="userManagementTableContainer">

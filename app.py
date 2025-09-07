@@ -1,7 +1,7 @@
 import os
 import json
 from datetime import datetime, timedelta
-from flask import Flask, jsonify, render_template, request, redirect, url_for, session, send_from_directory
+from flask import Flask, jsonify, render_template, request, redirect, url_for, session, send_from_directory, Response
 from flask_login import LoginManager, current_user, login_required, login_user, logout_user, UserMixin
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -11,6 +11,8 @@ import requests
 import pytz
 import uuid
 from werkzeug.utils import secure_filename
+import queue
+import threading
 
 # --- Basic Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -31,6 +33,7 @@ ALL_PERMISSIONS = {
 }
 YOUR_TIMEZONE = 'Asia/Manila'
 PAYOUT_UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'payout_uploads')
+REDATABASE_SHEET_NAME = 'REDATABASE'  # <-- Add this line
 
 # --- Flask App Initialization ---
 app = Flask(__name__)
@@ -73,6 +76,15 @@ try:
 except Exception as e:
     logging.error(f"FATAL ERROR: Could not load Google Sheets credentials. {e}")
     sheet_api = None
+
+
+# --- Local File Upload ---
+def upload_file_locally(file_stream, filename):
+    file_path = os.path.join(PAYOUT_UPLOAD_FOLDER, filename)
+    file_stream.seek(0)
+    with open(file_path, 'wb') as f:
+        f.write(file_stream.read())
+    return filename
 
 # --- Helper Functions ---
 def to_float(value):
@@ -157,6 +169,23 @@ def callback():
     user = User(id=user_id, name=user_name, email=user_email, is_admin=is_admin, permissions=permissions)
     users[user_id] = user
     login_user(user)
+
+    # --- Only allow users that admin has allowed (whitelist) ---
+    global ALLOWED_USER_EMAILS
+    user_data = get_sheet_data(DATABASE_SHEET_ID, f"{USERS_SHEET_NAME}!A:E")
+    if not user_data or len(user_data) < 2:
+        ALLOWED_USER_EMAILS = set()
+    else:
+        # Assume column 1 (EMAIL) and column 0 (ID) are present, and column 3 (ALLOWED) is "YES" or blank
+        allowed = set()
+        for row in user_data[1:]:
+            if len(row) > 3 and row[3].strip().upper() == "YES":
+                allowed.add(row[1].strip().lower())
+        ALLOWED_USER_EMAILS = allowed
+
+    if user_email not in ALLOWED_USER_EMAILS and user_email not in [email.lower() for email in ADMIN_USER_EMAILS]:
+        return "Access denied. You are not allowed to use this web app. Please contact the administrator.", 403
+
     return redirect(url_for('index'))
 
 @app.route("/logout")
@@ -278,20 +307,52 @@ def search_dashboard_data():
         except (ValueError, IndexError): continue
     final_ranked_ba_list = sorted(ba_period_fds.values(), key=lambda x: x['totalFd'], reverse=True)
     ba_incentives_map, sum_of_all_individual_incentives = {}, 0
-    if overall_total_valid_fd >= 6000:
+    # --- Only count FDs 100 and above for incentive eligibility ---
+    if overall_total_valid_fd >= 9000:
+        # --- New milestone for 20k+ total valid FD ---
+        milestone_20k = overall_total_valid_fd >= 20000
         for i, ba in enumerate(final_ranked_ba_list):
-            rank, incentive = i + 1, 0
-            if rank == 1: incentive = 3000
-            elif rank == 2: incentive = 1500
-            elif rank == 3: incentive = 900
-            elif 4 <= rank <= 6: incentive = 500
-            elif rank > 6 and ba['totalFd'] > 0: incentive = 200
+            rank = i + 1
+            eligible_fd = ba['totalFd'] if ba['totalFd'] >= 100 else 0
+            incentive = 0
+            if eligible_fd > 0:
+                if milestone_20k:
+                    # Apply new milestone incentives for 20k+
+                    if rank == 1:
+                        incentive = 5000
+                    elif rank == 2:
+                        incentive = 2500
+                    elif rank == 3:
+                        incentive = 1500
+                    elif 4 <= rank <= 6:
+                        incentive = 900
+                    elif 7 <= rank <= 10:
+                        incentive = 500
+                    elif rank > 10 and ba['totalFd'] >= 300:
+                        incentive = 400
+                    elif rank > 10:
+                        incentive = 200
+                else:
+                    # Existing incentive logic
+                    if rank == 1:
+                        if ba['totalFd'] >= 3000:
+                            incentive = 4000
+                        else:
+                            incentive = 3000
+                    elif rank == 2:
+                        incentive = 1500
+                    elif rank == 3:
+                        incentive = 900
+                    elif 4 <= rank <= 6:
+                        incentive = 500
+                    elif rank > 6:
+                        incentive = 200
             if incentive > 0:
                 ba_incentives_map[ba['originalName'].upper()] = incentive
                 sum_of_all_individual_incentives += incentive
     filtered_rows = [row for row in period_data_rows if ((not search_ba_names_lower or (len(row) > BA_NAME and row[BA_NAME].strip().lower() in search_ba_names_lower)) and (not search_palcode_lower or (len(row) > PALCODE and row[PALCODE].strip().lower() == search_palcode_lower)))]
     results_for_table = filtered_rows
-    commission_map = { 25.00: 5, 60.00: 10, 80.00: 20, 90.00: 10, 140.00: 10, 230.00: 20, 325.00: 25, 420.00: 30 }
+    commission_map = { 25.00: 5, 60.00: 10, 80.00: 10, 90.00: 10, 140.00: 10, 230.00: 20, 325.00: 25, 420.00: 30 }
     summary_for_display = {"totalRegistration": 0, "totalValidFd": 0, "totalSuspended": 0, "totalSalary": 0, "totalIncentives": 0, "totalCommission": 0}
     for row in filtered_rows:
         try:
@@ -365,6 +426,7 @@ def save_dashboard():
         batch_update_body = { 'valueInputOption': 'USER_ENTERED', 'data': update_requests }
         sheet_api.values().batchUpdate(spreadsheetId=DATABASE_SHEET_ID, body=batch_update_body).execute()
         log_user_event('saveDashboardData', {'updated_palcodes': [r['palcode'] for r in updated_rows_from_client]})
+        notify_dashboard_clients()  # Notify clients about the update
         return jsonify({"success": True, "message": f"Successfully updated {len(update_requests)} cells."})
     except Exception as e:
         logging.error(f"Error saving dashboard data: {e}")
@@ -385,38 +447,31 @@ def submit_payout():
     payout_info_path = os.path.join(PAYOUT_UPLOAD_FOLDER, 'payout_submissions.json')
     submissions = []
     was_overwritten = False
-    
+
     try:
         # Load existing submissions if the file exists
         if os.path.exists(payout_info_path):
             with open(payout_info_path, 'r', encoding='utf-8') as f:
                 submissions = json.load(f)
-        
+
         # Check for and remove any existing submission from the current user
         current_user_email = current_user.email
         existing_submission = next((sub for sub in submissions if sub.get('user_email') == current_user_email), None)
-        
+
         if existing_submission:
             was_overwritten = True
-            # Delete the old QR image file
-            old_qr_filename = existing_submission.get('qr_image')
-            if old_qr_filename:
-                old_file_path = os.path.join(PAYOUT_UPLOAD_FOLDER, old_qr_filename)
-                try:
-                    os.remove(old_file_path)
-                    logging.info(f"Overwriting: Deleted old QR image {old_file_path}")
-                except FileNotFoundError:
-                    logging.warning(f"Old QR image not found during overwrite: {old_file_path}")
-            
-            # Filter out the old submission
             submissions = [sub for sub in submissions if sub.get('user_email') != current_user_email]
 
-        # Save the new QR file
+        # Save the new QR file locally only
         filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{secure_filename(qr_file.filename)}"
-        file_path = os.path.join(PAYOUT_UPLOAD_FOLDER, filename)
-        qr_file.save(file_path)
+        upload_file_locally(qr_file.stream, filename)
 
-        # Add the new submission
+        # --- Use Asia/Manila timezone for submitted_at ---
+        import pytz
+        manila_tz = pytz.timezone('Asia/Manila')
+        submitted_at = datetime.now(manila_tz).strftime('%Y-%m-%dT%H:%M:%S%z')
+
+        # Add the new submission (store only the filename)
         submissions.append({
             'user_email': current_user_email,
             'ba_name': ba_name,
@@ -425,15 +480,16 @@ def submit_payout():
             'qr_image': filename,
             'submitted_at': datetime.now().isoformat()
         })
-        
-        # Write the updated list back to the file
+
+
+        # Write the updated list back to the file (still local for metadata)
         with open(payout_info_path, 'w', encoding='utf-8') as f:
             json.dump(submissions, f, indent=2)
 
     except Exception as e:
         logging.error(f"Error during payout submission: {e}")
         return jsonify({'success': False, 'error': 'Failed to save payout info.'}), 500
-    
+
     message = "Payout info updated successfully. Your previous submission was overwritten." if was_overwritten else "Payout info submitted successfully."
     return jsonify({'success': True, 'message': message})
 
@@ -461,16 +517,7 @@ def delete_payout():
             break
     if not payout_to_delete:
         return jsonify({'success': False, 'error': 'Payout submission not found.'}), 404
-    qr_filename = payout_to_delete.get('qr_image')
-    if qr_filename:
-        file_path = os.path.join(PAYOUT_UPLOAD_FOLDER, qr_filename)
-        try:
-            os.remove(file_path)
-            logging.info(f"Deleted image file: {file_path}")
-        except FileNotFoundError:
-            logging.warning(f"Image file not found for deletion: {file_path}")
-        except Exception as e:
-            logging.error(f"Error deleting image file {file_path}: {e}")
+    # Optionally: delete from GCS here if you want (not required for basic fix)
     updated_submissions = [p for p in submissions if p.get('submitted_at') != payout_id]
     try:
         with open(payout_info_path, 'w', encoding='utf-8') as f:
@@ -498,6 +545,7 @@ def list_payouts():
     else:
         visible_submissions = [s for s in submissions if s.get('user_email', '').lower() == current_user.email.lower()]
 
+    # qr_image is now a GCS URL
     return jsonify({'success': True, 'payouts': visible_submissions})
 
 @app.route('/uploads/<filename>')
@@ -538,12 +586,15 @@ def log_user_event(function_name, inputs):
         local_now = utc_now.astimezone(local_tz)
         timestamp = local_now.strftime('%A, %B %d, %Y, %I:%M:%S %p')
         user_email = current_user.email if current_user.is_authenticated else "Anonymous"
+        # --- Split inputs into separate columns ---
+        month = inputs.get('month', 'N/A')
+        week = inputs.get('week', 'N/A').replace('week ', '')
+        ba_names = ', '.join(inputs.get('baNames', [])) if inputs.get('baNames') else "N/A"
         if function_name == 'saveDashboardData':
             formatted_inputs = f"Updated data for {len(inputs.get('updated_palcodes', []))} palcodes."
+            new_row_data = [timestamp, user_email, function_name, formatted_inputs, '', '', '']
         else:
-            ba_names_str = ', '.join(inputs.get('baNames', [])) if inputs.get('baNames') else "N/A"
-            formatted_inputs = f"Month - {inputs.get('month', 'N/A')}, Week - {inputs.get('week', 'N/A').replace('week ', '')}, Ba Name(s) - {ba_names_str}, Palcode - {inputs.get('palcode', 'N/A') or 'N/A'}"
-        new_row_data = [timestamp, user_email, function_name, formatted_inputs]
+            new_row_data = [timestamp, user_email, function_name, month, week, ba_names]
         requests_body = [
             { "insertDimension": { "range": { "sheetId": logs_sheet_id, "dimension": "ROWS", "startIndex": 1, "endIndex": 2 } } },
             { "updateCells": { "rows": [ { "values": [ {"userEnteredValue": {"stringValue": str(cell)}} for cell in new_row_data ] } ], "fields": "userEnteredValue", "start": { "sheetId": logs_sheet_id, "rowIndex": 1, "columnIndex": 0 } } }
@@ -558,6 +609,49 @@ def find_user_row(users_sheet, email):
         if len(row) > 1 and row[1].strip().lower() == email:
             return idx
     return -1
+
+# --- Helper to get data from either DATABASE or REDATABASE ---
+def get_database_data(use_redatabase=False, range_str="A:L"):
+    """
+    Helper to fetch data from DATABASE or REDATABASE.
+    Set use_redatabase=True to fetch from REDATABASE.
+    """
+    sheet_name = REDATABASE_SHEET_NAME if use_redatabase else DATABASE_SHEET_NAME
+    return get_sheet_data(DATABASE_SHEET_ID, f"{sheet_name}!{range_str}")
+
+@app.route('/api/some-protected-endpoint')
+@login_required
+def some_protected():
+    if 'SPECIAL_PERMISSION' not in current_user.permissions:
+        return jsonify({'error': 'Forbidden'}), 403
+    # ...existing code...
+
+# --- Dashboard Events Streaming ---
+# Global list of queues for connected clients
+dashboard_event_queues = []
+
+@app.route('/events/dashboard')
+@login_required
+def dashboard_events():
+    def event_stream(q):
+        try:
+            while True:
+                msg = q.get()
+                yield f"data: {msg}\n\n"
+        except GeneratorExit:
+            pass
+
+    q = queue.Queue()
+    dashboard_event_queues.append(q)
+    try:
+        return Response(event_stream(q), mimetype="text/event-stream")
+    finally:
+        dashboard_event_queues.remove(q)
+
+def notify_dashboard_clients():
+    # Call this after dashboard data changes
+    for q in dashboard_event_queues:
+        q.put("update")
 
 if __name__ == '__main__':
     os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'

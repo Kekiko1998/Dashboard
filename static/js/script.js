@@ -32,11 +32,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const payoutFormStatus = document.getElementById('payoutFormStatus');
     const payoutInfoCards = document.getElementById('payoutInfoCards');
     const payoutTabBtn = document.getElementById('payoutTabBtn');
+    const burgerMenuBtn = document.getElementById('burgerMenuBtn');
+    const mobileTabsMenu = document.getElementById('mobileTabsMenu');
+    const mainTabs = document.getElementById('mainTabs');
+    const mobileMenuOverlay = document.getElementById('mobileMenuOverlay');
 
     // --- State Variables ---
     let isAdmin = false;
     let userPermissions = new Set();
     const statusOptions = ['PAID', 'DELAYED', 'UPDATING', 'INVALID', 'UNOFFICIAL', 'ON GOING'];
+    let autoRefreshInterval = null;
+    let lastSearchParams = null;
 
     // --- Initial Data Fetching & UI Setup ---
     function setupUIForUser(userInfo) {
@@ -63,6 +69,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }).then(userInfo => {
         if (userInfo) {
             setupUIForUser(userInfo);
+            syncAdminTabVisibility(); // <-- Add this line to immediately sync admin tab visibility
             if (userPermissions.has('MULTI_SELECT') || userPermissions.has('SEARCH_ALL')) {
                 populateBaNameDropdown();
             }
@@ -224,8 +231,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // --- Search & Data Handling ---
-    function performSearch() {
-        const month = monthSelect.value, week = weekSelect.value, palcode = palcodeInput.value.trim();
+    function performSearch(auto = false) {
+        const month = monthSelect.value, week = weekSelect.value;
         let baNamesToSearch = [];
         if (userPermissions.has('MULTI_SELECT') || userPermissions.has('SEARCH_ALL')) {
             const checkedBoxes = baNameCheckboxList.querySelectorAll('input[type="checkbox"]:checked');
@@ -244,14 +251,18 @@ document.addEventListener('DOMContentLoaded', function() {
         showTab('dashboardDisplayArea', dashboardTabBtn); 
         dashboardPlaceholder.style.display = 'none'; dashboardDataDisplay.style.display = 'none';
         dashboardSearchError.style.display = 'none'; loadingIndicator.style.display = 'flex';
-        const searchPayload = { month: month, week: week, baNames: baNamesToSearch, palcode: palcode };
+        const searchPayload = { month: month, week: week, baNames: baNamesToSearch };
         fetch('/api/search', {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(searchPayload),
         }).then(res => {
             if (res.status === 401) { window.location.href = '/login'; return Promise.reject('Session expired'); }
             if (!res.ok) { return res.json().then(errData => { throw new Error(errData.error || `Server error: ${res.status}`); }); }
             return res.json(); // <-- FIXED: call the function
-        }).then(data => handleSearchSuccess(data)).catch(error => handleSearchFailure(error));
+        }).then(data => {
+            handleSearchSuccess(data);
+            // At the end of a successful search, save the params:
+            lastSearchParams = { month, week, baNames: baNamesToSearch };
+        }).catch(error => handleSearchFailure(error));
     }
 
     function handleSearchSuccess(data) {
@@ -268,6 +279,7 @@ document.addEventListener('DOMContentLoaded', function() {
             dashboardSearchError.querySelector('p').textContent = `⚠️ ${data.message || 'No data found for this query.'}`;
             dashboardSearchError.style.display = 'flex'; dashboardDataDisplay.style.display = 'none';
         }
+        // startAutoRefresh(); // <-- REMOVED: SSE is now responsible for auto-refresh
     }
     function handleSearchFailure(error) {
         if (error.message.includes('Session expired')) { console.log("Session expired, redirecting..."); return; }
@@ -325,7 +337,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if(totalValidFdValue) animateValue(totalValidFdValue, 0, summary.totalValidFd || 0, 700);
         if(totalSuspendedValue) animateValue(totalSuspendedValue, 0, summary.totalSuspended || 0, 700);
         if(totalSalaryValue) animateValue(totalSalaryValue, 0, summary.totalSalary || 0, 700, true);
-        if(totalIncentiveValue) animateValue(totalIncentiveValue, 0, summary.totalIncentives || 0, 700, true);
         if (totalCommissionValue && userPermissions.has('VIEW_COMMISSION')) { animateValue(totalCommissionValue, 0, summary.totalCommission || 0, 700); }
         if(monthDisplay) monthDisplay.textContent = data.monthDisplay || "N/A";
         if(weekDisplay) weekDisplay.textContent = data.weekDisplay || "N/A";
@@ -336,7 +347,8 @@ document.addEventListener('DOMContentLoaded', function() {
             baRankingListDiv.innerHTML = ''; 
             if (data.rankedBaList && data.rankedBaList.length > 0) {
                 data.rankedBaList.forEach((ba, index) => {
-                    const itemDiv = document.createElement('div'); itemDiv.classList.add('ba-rank-item');
+                    const itemDiv = document.createElement('div');
+                    itemDiv.classList.add('ba-rank-item', `rank-${index + 1}`);
                     const rankSpan = document.createElement('span'); rankSpan.classList.add('rank-number'); rankSpan.textContent = `${index + 1}.`;
                     const nameSpan = document.createElement('span'); nameSpan.classList.add('ba-name'); nameSpan.textContent = ba.originalName || "N/A"; nameSpan.title = ba.originalName || "N/A";
                     const fdSpan = document.createElement('span'); fdSpan.classList.add('ba-fd-count'); fdSpan.textContent = (ba.totalFd || 0).toLocaleString();
@@ -351,40 +363,50 @@ document.addEventListener('DOMContentLoaded', function() {
             tableControls.style.display = 'flex';
         } else { tableControls.style.display = 'none'; }
         if (data.resultsTable && data.resultsTable.length > 0) {
-            const table = document.createElement('table'), thead = document.createElement('thead'), tbody = document.createElement('tbody'), headerRow = document.createElement('tr');
-            const headers = ['PALCODE','MONTH','WEEK','BA Name','REG','Valid FD','Suspended FD','Rate','GGR Per FD','Total GGR','SALARY','Status'];
-            const editableColumns = ['MONTH', 'WEEK', 'BA Name', 'REG', 'Valid FD', 'Suspended FD', 'Total GGR'];
-            const thNo = document.createElement('th'); thNo.textContent = 'No.'; headerRow.appendChild(thNo);
-            headers.forEach(text => { const th = document.createElement('th'); th.textContent = text.toUpperCase(); headerRow.appendChild(th); });
-            thead.appendChild(headerRow); table.appendChild(thead);
-            data.resultsTable.forEach((rowData, rowIndex) => {
-                const tr = document.createElement('tr'); tr.dataset.palcode = rowData[0];
-                tr.classList.add('result-row-animate'); tr.style.animationDelay = `${rowIndex * 0.05}s`;
-                const tdNo = document.createElement('td'); tdNo.textContent = rowIndex + 1; tr.appendChild(tdNo);
-                headers.forEach((header, cellIndex) => {
-                    const td = document.createElement('td');
-                    const fieldName = header.toLowerCase().replace(/ /g, '_'); td.dataset.field = fieldName;
-                    const cellData = (rowData[cellIndex] === null || rowData[cellIndex] === undefined) ? '' : rowData[cellIndex];
-                    if (userPermissions.has('EDIT_TABLE') && header === 'Status') {
-                        const select = document.createElement('select');
-                        statusOptions.forEach(option => {
-                            const optionEl = document.createElement('option');
-                            optionEl.value = option; optionEl.textContent = option;
-                            if (option.toUpperCase() === cellData.toString().toUpperCase()) { optionEl.selected = true; }
-                            select.appendChild(optionEl);
-                        });
-                        td.appendChild(select);
-                    } else {
-                        td.textContent = cellData;
-                        if (userPermissions.has('EDIT_TABLE') && editableColumns.includes(header)) {
-                            td.contentEditable = "true"; td.classList.add('editable-cell');
-                        }
-                    }
-                    tr.appendChild(td);
-                });
-                tbody.appendChild(tr);
+            // --- Filter out rows with "Disqualified" status or 0 FD turnover ---
+            const filteredRows = data.resultsTable.filter(row => {
+                const status = (row[11] || '').toString().trim().toLowerCase();
+                const validFd = Number(row[5]) || 0;
+                return status !== 'disqualified' && validFd > 0;
             });
-            table.appendChild(tbody); resultsTableContainer.appendChild(table);
+            if (filteredRows.length === 0) {
+                resultsTableContainer.innerHTML = `<p class="no-data-message">${data.message || 'Summary data is shown in the left panel. No detailed records for this query.'}</p>`;
+            } else {
+                const table = document.createElement('table'), thead = document.createElement('thead'), tbody = document.createElement('tbody'), headerRow = document.createElement('tr');
+                const headers = ['PALCODE','MONTH','WEEK','BA Name','REG','Valid FD','Suspended FD','Rate','GGR Per FD','Total GGR','SALARY','Status'];
+                const editableColumns = ['MONTH', 'WEEK', 'BA Name', 'REG', 'Valid FD', 'Suspended FD', 'Total GGR'];
+                const thNo = document.createElement('th'); thNo.textContent = 'No.'; headerRow.appendChild(thNo);
+                headers.forEach(text => { const th = document.createElement('th'); th.textContent = text.toUpperCase(); headerRow.appendChild(th); });
+                thead.appendChild(headerRow); table.appendChild(thead);
+                filteredRows.forEach((rowData, rowIndex) => {
+                    const tr = document.createElement('tr'); tr.dataset.palcode = rowData[0];
+                    tr.classList.add('result-row-animate'); tr.style.animationDelay = `${rowIndex * 0.05}s`;
+                    const tdNo = document.createElement('td'); tdNo.textContent = rowIndex + 1; tr.appendChild(tdNo);
+                    headers.forEach((header, cellIndex) => {
+                        const td = document.createElement('td');
+                        const fieldName = header.toLowerCase().replace(/ /g, '_'); td.dataset.field = fieldName;
+                        const cellData = (rowData[cellIndex] === null || rowData[cellIndex] === undefined) ? '' : rowData[cellIndex];
+                        if (userPermissions.has('EDIT_TABLE') && header === 'Status') {
+                            const select = document.createElement('select');
+                            statusOptions.forEach(option => {
+                                const optionEl = document.createElement('option');
+                                optionEl.value = option; optionEl.textContent = option;
+                                if (option.toUpperCase() === cellData.toString().toUpperCase()) { optionEl.selected = true; }
+                                select.appendChild(optionEl);
+                            });
+                            td.appendChild(select);
+                        } else {
+                            td.textContent = cellData;
+                            if (userPermissions.has('EDIT_TABLE') && editableColumns.includes(header)) {
+                                td.contentEditable = "true"; td.classList.add('editable-cell');
+                            }
+                        }
+                        tr.appendChild(td);
+                    });
+                    tbody.appendChild(tr);
+                });
+                table.appendChild(tbody); resultsTableContainer.appendChild(table);
+            }
         } else { resultsTableContainer.innerHTML = `<p class="no-data-message">${data.message || 'Summary data is shown in the left panel. No detailed records for this query.'}</p>`; }
         if(dashboardDataDisplay) { dashboardDataDisplay.style.opacity = '0'; setTimeout(() => { dashboardDataDisplay.style.opacity = '1'; }, 50); }
     }
@@ -551,4 +573,103 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         window.requestAnimationFrame(step);
     }
+
+    // --- Burger menu logic ---
+    function closeMobileMenu() {
+        mobileTabsMenu.classList.remove('open');
+        mobileMenuOverlay.classList.remove('open');
+    }
+    function openMobileMenu() {
+        mobileTabsMenu.classList.add('open');
+        mobileMenuOverlay.classList.add('open');
+    }
+    if (burgerMenuBtn && mobileTabsMenu && mobileMenuOverlay) {
+        burgerMenuBtn.addEventListener('click', function(e) {
+            if (mobileTabsMenu.classList.contains('open')) {
+                closeMobileMenu();
+            } else {
+                openMobileMenu();
+            }
+            e.stopPropagation();
+        });
+        mobileMenuOverlay.addEventListener('click', closeMobileMenu);
+        // Hide menu on tab click
+        Array.from(mobileTabsMenu.querySelectorAll('.tab-button')).forEach(btn => {
+            btn.addEventListener('click', closeMobileMenu);
+        });
+    }
+
+    // Sync admin tab visibility for mobile
+    function syncAdminTabVisibility() {
+        const adminTabBtn = document.getElementById('adminTabBtn');
+        const mobileAdminTabBtn = document.getElementById('mobileAdminTabBtn');
+        if (adminTabBtn && mobileAdminTabBtn) {
+            mobileAdminTabBtn.style.display = adminTabBtn.style.display;
+        }
+    }
+
+    // Sync active tab between desktop and mobile
+    function syncActiveTab(tabId) {
+        const tabMap = {
+            'homeArea': ['homeTabBtn', 'mobileHomeTabBtn'],
+            'dashboardDisplayArea': ['dashboardTabBtn', 'mobileDashboardTabBtn'],
+            'salarySchemeArea': ['salaryTabBtn', 'mobileSalaryTabBtn'],
+            'adminArea': ['adminTabBtn', 'mobileAdminTabBtn'],
+            'payoutArea': ['payoutTabBtn', 'mobilePayoutTabBtn']
+        };
+        Object.values(tabMap).forEach(([desktopId, mobileId]) => {
+            const dBtn = document.getElementById(desktopId);
+            const mBtn = document.getElementById(mobileId);
+            if (dBtn) dBtn.classList.remove('active');
+            if (mBtn) mBtn.classList.remove('active');
+        });
+        const ids = tabMap[tabId];
+        if (ids) {
+            const dBtn = document.getElementById(ids[0]);
+            const mBtn = document.getElementById(ids[1]);
+            if (dBtn) dBtn.classList.add('active');
+            if (mBtn) mBtn.classList.add('active');
+        }
+    }
+
+    // Patch showTab to sync active state
+    const origShowTab = window.showTab;
+    window.showTab = function(tabId, clickedButton) {
+        origShowTab(tabId, clickedButton);
+        syncActiveTab(tabId);
+        syncAdminTabVisibility();
+    };
+    // Initial sync for admin tab
+    syncAdminTabVisibility();
+
+    // Auto-refresh logic
+    let dashboardSSE = null;
+
+    function startDashboardSSE() {
+        if (dashboardSSE) dashboardSSE.close();
+        dashboardSSE = new EventSource('/events/dashboard');
+        dashboardSSE.onmessage = function(event) {
+            // Only refresh if dashboard is visible and lastSearchParams exist
+            const dashboardVisible = document.getElementById('dashboardDisplayArea').style.display !== 'none';
+            if (dashboardVisible && lastSearchParams) {
+                fetch('/api/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(lastSearchParams),
+                })
+                .then(res => res.json())
+                .then(data => handleSearchSuccess(data))
+                .catch(err => console.error('SSE refresh error:', err));
+            }
+        };
+        dashboardSSE.onerror = function() {
+            // Try to reconnect after a delay
+            setTimeout(startDashboardSSE, 5000);
+        };
+    }
+
+    // Start SSE after login/init
+    document.addEventListener('DOMContentLoaded', () => {
+        startDashboardSSE();
+    });
 });
